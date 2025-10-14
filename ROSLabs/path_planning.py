@@ -17,7 +17,7 @@ import numpy as np
 import heapq
 
 # Using imageio to read in the image
-import imageio
+import imageio.v2 as imageio
 
 
 # -------------- Showing start and end and path ---------------
@@ -50,31 +50,32 @@ def plot_with_path(im, im_threshhold, zoom=1.0, robot_loc=None, goal_loc=None, p
     axs[1].plot(10, 5, 'xy', markersize=5)
 
     # Show original and thresholded image
-    for i in range(0, 2):
+    for indx in range(0, 2):
         if robot_loc is not None:
-            axs[i].plot(robot_loc[0], robot_loc[1], '+r', markersize=10)
+            axs[indx].plot(robot_loc[0], robot_loc[1], '+r', markersize=10)
         if goal_loc is not None:
-            axs[i].plot(goal_loc[0], goal_loc[1], '*g', markersize=10)
+            axs[indx].plot(goal_loc[0], goal_loc[1], '*g', markersize=10)
         if path is not None:
             for p, q in zip(path[0:-1], path[1:]):
-                axs[i].plot([p[0], q[0]], [p[1], q[1]], '-y', markersize=2)
-                axs[i].plot(p[0], p[1], '.y', markersize=2)
-        axs[i].axis('equal')
+                axs[indx].plot([p[0], q[0]], [p[1], q[1]], '-y', markersize=2)
+                axs[indx].plot(p[0], p[1], '.y', markersize=2)
+        axs[indx].axis('equal')
 
-    for i in range(0, 2):
+    for indx in range(0, 2):
         # Implements a zoom - set zoom to 1.0 if no zoom
         width = im.shape[1]
         height = im.shape[0]
 
-        axs[i].set_xlim(width / 2 - zoom * width / 2, width / 2 + zoom * width / 2)
-        axs[i].set_ylim(height / 2 - zoom * height / 2, height / 2 + zoom * height / 2)
+        axs[indx].set_xlim(width / 2 - zoom * width / 2, width / 2 + zoom * width / 2)
+        axs[indx].set_ylim(height / 2 - zoom * height / 2, height / 2 + zoom * height / 2)
 
 
 # -------------- Thresholded image True/False ---------------
 def is_wall(im, pix):
     """ Is the pixel a wall pixel?
     @param im - the image
-    @param pix - the pixel i,j"""
+    @param pix - the pixel i,j
+    @return True if pixel value is zero"""
     if im[pix[1], pix[0]] == 0:
         return True
     return False
@@ -83,7 +84,8 @@ def is_wall(im, pix):
 def is_unseen(im, pix):
     """ Is the pixel one we've seen?
     @param im - the image
-    @param pix - the pixel i,j"""
+    @param pix - the pixel i,j
+    @return True if pixel value 128 (the unseen color value)"""
     if im[pix[1], pix[0]] == 128:
         return True
     return False
@@ -92,20 +94,21 @@ def is_unseen(im, pix):
 def is_free(im, pix):
     """ Is the pixel empty?
     @param im - the image
-    @param pix - the pixel i,j"""
+    @param pix - the pixel i,j
+    return True if 255 """
     if im[pix[1], pix[0]] == 255:
         return True
     return False
 
 
 def convert_image(im, wall_threshold, free_threshold):
-    """ Convert the image to a thresholded image with not seen pixels marked
-    @param im - WXHX ?? image (depends on input)
-    @param wall_threshold - number between 0 and 1 to indicate wall
-    @param free_threshold - number between 0 and 1 to indicate free space
+    """ Convert the image to a thresholded image with 'not seen' pixels marked
+    @param im - width by height image as numpy (depends on input)
+    @param wall_threshold - number between 0 and 1 to indicate wall threshold value
+    @param free_threshold - number between 0 and 1 to indicate free space threshold value
     @return an image of the same WXH but with 0 (free) 255 (wall) 128 (unseen)"""
 
-    # Assume all is unseen
+    # Assume all is unseen - fill the image with 128
     im_ret = np.zeros((im.shape[0], im.shape[1]), dtype='uint8') + 128
 
     im_avg = im
@@ -126,11 +129,11 @@ def four_connected(pix):
     """ Generator function for 4 neighbors
     @param im - the image
     @param pix - the i, j location to iterate around"""
-    for i in [-1, 1]:
-        ret = pix[0] + i, pix[1]
+    for indx in [-1, 1]:
+        ret = pix[0] + indx, pix[1]
         yield ret
-    for i in [-1, 1]:
-        ret = pix[0], pix[1] + i
+    for indx in [-1, 1]:
+        ret = pix[0], pix[1] + indx
         yield ret
 
 
@@ -138,11 +141,12 @@ def eight_connected(pix):
     """ Generator function for 8 neighbors
     @param im - the image
     @param pix - the i, j location to iterate around"""
-    for i in range(-1, 2):
+    for indx in range(-1, 2):
         for j in range(-1, 2):
-            if i == 0 and j == 0:
+            # Skip the middle pixel
+            if indx == 0 and j == 0:
                 pass
-            ret = pix[0] + i, pix[1] + j
+            ret = pix[0] + indx, pix[1] + j
             yield ret
 
 
@@ -173,49 +177,45 @@ def dijkstra(im, robot_loc, goal_loc):
     # This is easier than trying to get the distance from the heap
     visited = {}
     # Use the (i,j) tuple to index the dictionary
-    #   Store the best distance, the parent, and if closed y/n
-    visited[robot_loc] = (0, None, False)   # For every other node this will be the current_node, distance
+    #   Store the best distance found so far, the parent node, and if it is closed y/n
+    # Push the first node onto the heap - distance is zero, it has no parent, and it is NOT closed
+    visited[robot_loc] = (0, None, False)   # For every other node this will be the current_node, distance, False
 
-    # While the list is not empty - use a break for if the node is the end node
+    # While the list is not empty 
+    # Use a break statement to end the while loop if you encounter the goal node before the queue empties
     while priority_queue:
-        # Get the current best node off of the list
+        # Get the current best node off of the list (pop the node off the queue)
         current_node = heapq.heappop(priority_queue)
         # Pop returns the value and the i, j
-        node_score = current_node[0]
-        node_ij = current_node[1]
+        distance_to_current_node = current_node[0]
+        current_node_ij = current_node[1]  # i,j index of current node
 
         # Showing how to get this data back out of visited
-        visited_triplet = visited[node_ij]
-        visited_distance = visited_triplet[0]
-        visited_parent = visited_triplet[1]
-        visited_closed_yn = visited_triplet[2]
+        visited_triplet = visited[current_node_ij]  # This is a tuple with three values
+        visited_distance = visited_triplet[0]       # First value is the current distance stored for that node
+        visited_parent = visited_triplet[1]         # Second value is the parent node of this one
+        visited_closed_yn = visited_triplet[2]      # Third value is if this node is closed y/n
 
-        # TODO
-        #  Step 1: Break out of the loop if node_ij is the goal node
+        # GUIDE
+        #  Step 1: Break out of the loop if current_node_ij is the goal node
         #  Step 2: If this node is closed, skip it
         #  Step 3: Set the node to closed
         #    Now do the instructions from the slide (the actual algorithm)
-        #  Lec 8_1: Planning, at the end
+        #  Lec : Planning, at the end
         #  https://docs.google.com/presentation/d/1pt8AcSKS2TbKpTAVV190pRHgS_M38ldtHQHIltcYH6Y/edit#slide=id.g18d0c3a1e7d_0_0
         # YOUR CODE HERE
 
     # Now check that we actually found the goal node
     try_2 = goal_loc
     if not goal_loc in visited:
-        # TODO: Deal with not being able to get to the goal loc
-        # BEGIN SOLULTION
-        best = 1e30
-        for v in visited:
-            if v[0] < best:
-                best = v[0]
-                try_2 = v[1]
-        return dijkstra(im, robot_loc, try_2)
+        # GUIDE: Deal with not being able to get to the goal loc
+        # YOUR CODE HERE
         raise ValueError(f"Goal {goal_loc} not reached")
         return []
 
     path = []
     path.append(goal_loc)
-    # TODO: Build the path by starting at the goal node and working backwards
+    # GUIDE: Build the path by starting at the goal node and working backwards
     # YOUR CODE HERE
 
     return path
@@ -225,6 +225,8 @@ def open_image(im_name):
     """ A helper function to open up the image and the yaml file and threshold
     @param im_name - name of image in Data directory
     @returns image anbd thresholded image"""
+
+    import yaml as yaml
 
     # Needed for reading in map info
     from os import open
@@ -248,9 +250,7 @@ def open_image(im_name):
 
 
 if __name__ == '__main__':
-    # Putting this here because in JN it's yaml
-    import yaml_1 as yaml
-
+    
     # Use one of these
 
     """ Values for SLAM map
@@ -280,6 +280,8 @@ if __name__ == '__main__':
 
     # Depending on if your mac, windows, linux, and if interactive is true, you may need to call this to get the plt
     # windows to show
-    # plt.show()
+    # Putting this in here to avoid messing up ROS
+    import matplotlib.pyplot as plt
+    plt.show()
 
     print("Done")

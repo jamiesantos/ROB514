@@ -19,11 +19,6 @@ import numpy as np
 
 # Your path planning code
 import path_planning as path_planning
-# Our priority queue
-import heapq
-
-# Using imageio to read in the image
-import imageio
 
 
 # -------------- Showing start and end and path ---------------
@@ -106,7 +101,7 @@ def is_reachable(im, pix):
     @param im - the image
     @param pix - the pixel i,j"""
 
-    # Returns True (the pixel is adjacent to a pixel that is free)
+    # GUIDE: Returns True (the pixel is adjacent to a pixel that is free)
     #  False otherwise
     # You can use four or eight connected - eight will return more points
     # YOUR CODE HERE
@@ -142,9 +137,6 @@ def find_waypoints(im, path):
     # YOUR CODE HERE
 
 if __name__ == '__main__':
-    # Doing this here because it is a different yaml than JN
-    import yaml_1 as yaml
-
     im, im_thresh = path_planning.open_image("map.pgm")
 
     robot_start_loc = (1940, 1953)
@@ -160,6 +152,8 @@ if __name__ == '__main__':
 
     # Depending on if your mac, windows, linux, and if interactive is true, you may need to call this to get the plt
     # windows to show
-    # plt.show()
+    # Putting this in here to avoid messing up ROS
+    import matplotlib.pyplot as plt
+    plt.show()
 
     print("Done")
