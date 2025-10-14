@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 import os 
 import sys
-if "Sklls" not in sys.path:
+if "Skills" not in sys.path:
     save_path = os.getcwd()
     os.chdir("..")
     sys.path.append(f'{os.getcwd()}/Skills')

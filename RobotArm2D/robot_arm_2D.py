@@ -13,10 +13,11 @@ import numpy as np
 import os 
 import sys
 if "GUI" not in sys.path:
-    save_path = os.getcwd()
-    os.chdir("..")
-    sys.path.append(f'{os.getcwd()}/GUI')
-    os.chdir(save_path)
+    sys.path.insert(0, os.path.abspath('./GUI'))
+    sys.path.insert(0, os.path.abspath('../GUI'))
+if "Skills" not in sys.path:
+    sys.path.insert(0, os.path.abspath('./Skills'))
+    sys.path.insert(0, os.path.abspath('../Skills'))
 from gui_sliders import SliderFloatDisplay
 import arm_forward_kinematics as afk
 import arm_ik_gradient as ik_gradient
