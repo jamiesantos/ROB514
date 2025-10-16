@@ -57,7 +57,7 @@ class MyStopper(Node):
 		# This should be a numpy array of length num_readings, that starts at angle_min and ends at angle_max
   # YOUR CODE HERE
 
-		# GUIDE: Determine what the closest obstacle/reading is for scans in front of the robot
+		# BUIDE: Determine what the closest obstacle/reading is for scans in front of the robot
 		#  Step 1: Determine which of the range readings correspond to being "in front of" the robot (see comment at top)
 		#    Remember that robot scans are in the robot's coordinate system - theta = 0 means straight ahead
 		#  Step 2: Get the minimum distance to the closest object (use only scans "in front of" the robot)
