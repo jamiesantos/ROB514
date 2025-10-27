@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Mostly ways to make objects from lists of vertices
+# How to make objects from lists of vertices and move them around (and plot them)
 #
 # Square: make a square and store it in a json
 # Clicking: Bring up a window and let the user click points to make an object (clicking on the first point closes the
@@ -114,8 +114,10 @@ def make_wedge():
 def get_pts_as_numpy_array(obj):
     """ Get the points out as a 3xn array, last row 1'x (i.e., homogenous points)
     @param obj - the object
-    @return numpy array of XYs"""
+    @return the points as a 3xn numpy array """
     pts = None
+    # GUIDE: Create a 3xn numpy array, with the last row 1's, and the points filled
+    #  in from the obj["XYs"] key-value
     # YOUR CODE HERE
     return pts
 
