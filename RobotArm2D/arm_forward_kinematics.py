@@ -10,14 +10,6 @@ import matplotlib.pyplot as plt
 # Slides: https://docs.google.com/presentation/d/11gInwdUCRLz5pAwkYoHR4nzn5McAqfdktITMUe32-pM/edit?usp=sharing
 #
 
-import os 
-import sys
-if "Skills" not in sys.path:
-    save_path = os.getcwd()
-    os.chdir("..")
-    sys.path.append(f'{os.getcwd()}/Skills')
-    os.chdir(save_path)
-
 import matrix_transforms as mt
 from objects_in_world import read_object, plot_object_in_world_coord_system
 
