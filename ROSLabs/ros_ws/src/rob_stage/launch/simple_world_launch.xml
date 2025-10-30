@@ -3,7 +3,7 @@
   <!-- Launch a basic version of Stage. -->
   
   <include file="$(find-pkg-share stage_ros2)/launch/stage.launch.py">
-    <arg name="world" value="$(find-pkg-config rob_stage)/empty.world" />
+	<arg name="world" value="$(find-pkg-share rob_stage)/empty.world" />
     <arg name="one_tf_tree" value="false" />
   </include>
 
