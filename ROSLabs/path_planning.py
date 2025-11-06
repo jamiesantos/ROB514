@@ -211,16 +211,12 @@ def dijkstra(im, robot_loc, goal_loc):
         else:
              visited[current_node_ij] = (visited_distance, visited_parent, True)
 
-        # Iterate through four adjacent neighbors
+        # Check each neighbor
         for neighbor in four_connected(current_node_ij):
             i = neighbor[0]
             j = neighbor[1]
-
-            # Ignore out-of-bounds neighbors
-            if i < 0 or j < 0 or j >= im.shape[0] or i >= im.shape[1] or not is_free(im, (i, j)):
+            if not is_free(im, (i, j)):
                 continue
-            
-            # Get the new distance/cost and update the node
             cost = distance_to_current_node + 1
             if neighbor not in visited or cost < visited[neighbor][0]:
                 visited[neighbor] = (cost, current_node_ij, False)
