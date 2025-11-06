@@ -109,12 +109,12 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+#.venv
 env/
-venv/
+#venv/
 ENV/
 env.bak/
-venv.bak/
+#venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -134,3 +134,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /Shell_code_ROS/.idea/
+
+pyproject.toml
+mac_install.sh
+uv.lock
+*.OTTER_LOG
+../.DS_Store
