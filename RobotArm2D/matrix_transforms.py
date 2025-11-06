@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# This assignment uses matrices to keep track of multiple coordinate systems (robot, world, arm, object)
+#   This is all in 2D, because it's easier to draw. That includes the camera, who's "image" is just going
+#    to be a line segment
+#
 # This should really be done with classes, not dictionaries, but that adds another layer of coding complexity.
 #   So everything is dictionaries, and functions that take in dictionaries.
 #
@@ -11,6 +15,7 @@
 #
 # This file is JUST matrices. Do it first.
 
+# Overview slides: https://docs.google.com/presentation/d/1nTexr-lPdkq3HW4ouzYTa9iEiO-6K7j5ihHvZqixIsM/edit?usp=sharing
 # Slides for this assignment: https://docs.google.com/presentation/d/1iTi45y5AghMZRgStPX4mPdR7uYFQdRBjaekOW7ESTxM/edit?usp=sharing
 
 import numpy as np
@@ -38,9 +43,10 @@ def make_scale_matrix(scale_x=1.0, scale_y=1.0):
         raise ValueError(f"Scale values should be non_zero {scale_x}, {scale_y}")
 
     mat = np.identity(3)
-    # GUIDE: set the relevant values of mat
+    # TODO: set the relevant values of mat
     # YOUR CODE HERE
-
+    mat[0,0] = scale_x
+    mat[1,1] = scale_y
     return mat
 
 
@@ -51,9 +57,10 @@ def make_translation_matrix(d_x=0.0, d_y=0.0):
     @returns a 3x3 translation matrix"""
 
     mat = np.identity(3)
-    # GUIDE: set the relevant values of mat
+    # TODO: set the relevant values of mat
     # YOUR CODE HERE
-
+    mat[0,2] = d_x
+    mat[1,2] = d_y
     return mat
 
 
@@ -64,9 +71,12 @@ def make_rotation_matrix(theta=0.0):
     @returns a 3x3 rotation matrix"""
 
     mat = np.identity(3)
-    # GUIDE: set the relevant values of mat
+    # TODO: set the relevant values of mat
     # YOUR CODE HERE
-
+    mat[0,0] = np.cos(theta)
+    mat[0,1] = -np.sin(theta)
+    mat[1,0] = np.sin(theta)
+    mat[1,1] = np.cos(theta)
     return mat
 
 
@@ -120,9 +130,10 @@ def make_matrix_from_sequence(seq):
             next_mat = make_rotation_matrix(s["theta"])
         else:
             raise ValueError(f"Expected one of translate, scale, rotate, got {s['type']}")
-        # GUIDE: multiply next_mat by mat and store the result in mat
+        # TODO: multiply next_mat by mat and store the result in mat
         #    (reminder: @ is matrix multiplication)
         # YOUR CODE HERE
+        mat = next_mat@mat
     return mat
 
 
@@ -136,7 +147,7 @@ def get_sx_sy_from_matrix(mat):
     @param mat - the matrix
     @returns sx, sy - how the x and y axes are scaled"""
 
-    # GUIDE:
+    # TODO:
     #  1) Create a vector for the x-axis and multiply it by the matrix. The LENGTH of the vector is the scale
     #     in x
     #  2) Repeat for the y-axis
@@ -144,6 +155,11 @@ def get_sx_sy_from_matrix(mat):
     #   third coordinate, since vectors do not have a location
     # np.linalg.norm() will get the length of the vector
     # YOUR CODE HERE
+    x = [1, 0, 0]
+    y = [0, 1, 0]
+    sx = np.linalg.norm(np.dot(x,mat))
+    sy = np.linalg.norm(np.dot(y,mat))
+    return sx, sy
 
 
 def get_dx_dy_from_matrix(mat):
@@ -151,13 +167,17 @@ def get_dx_dy_from_matrix(mat):
     @param mat - the matrix
     @returns dx, dy - the transformed point 0,0"""
 
-    # GUIDE:
+    # TODO:
     #  1) Multiply the point (0,0) by the matrix
     #  2) Return the point mat * pt
     # Don't forget to turn origin into a homogenous point...
     #   Multiply the origin by the matrix then return the x and y components
     # Reminder: @ is the matrix multiplication
     # YOUR CODE HERE
+    point = mat @ [0, 0, 1]
+    dx = point[0]
+    dy = point[1]
+    return dx, dy
 
 
 # Doing this one in two pieces - first, get out how the axes (1,0) and (0,1) are transformed, then in the mext
@@ -167,11 +187,14 @@ def get_axes_from_matrix(mat):
     @param mat - the matrix
     @returns x_rotated_axis, y_rotated_axis - the transformed vectors"""
 
-    # GUIDE:
+    # TODO:
     #  1) Set x_axis to be a unit vector pointing down the x axis
     #  2) Set y_axis to be a unit vector pointing down the y axis
     #  Multiply by the matrix to get the new "x" and "y" axes
     # YOUR CODE HERE
+    x_axis = [1, 0, 0]
+    y_axis = [0, 1, 0]
+    return (mat@x_axis)[:2], (mat@y_axis)[:2]
 
 
 def get_theta_from_matrix(mat):
@@ -179,12 +202,15 @@ def get_theta_from_matrix(mat):
     @param mat - the matrix
     @return theta, the rotation amount in radians"""
 
-    # GUIDE
+    # TODO
     # Step 1) Use get_axes_from_matrix to get the x_axis,
     # Step 2) use arctan2 to turn the rotated x axis vector into an angle
     #   Use the x axis because theta for the x axis is 0 (makes the math easier)
     # Reminder: arctan2 takes (y, x)
     # YOUR CODE HERE
+    x_axis, y_axis = get_axes_from_matrix(mat)
+    theta = np.arctan2(x_axis[1], x_axis[0])
+    return theta
 
 
 # -------------------------------- Check and test routines ------------------------------
@@ -199,10 +225,14 @@ def check_is_rotation(mat, b_print=False):
 
     # Hint: Use get_axes_from_matrix to get the first and second rows from the 3x3 matrix
     # You might find numpy.linalg.norm and numpy.dot and numpy.isclose useful
-    # GUIDE: Return TRUE if the matrix is orthonormal/rotation matrix
+    # TODO: Return TRUE if the matrix is orthonormal/rotation matrix
     #       Return FALSE otherwise
     #       If b_print_test is True, also print out why the rotation matrix failed
     # YOUR CODE HERE
+    inv_mat = np.linalg.inv(mat)
+    transpose_mat = np.transpose(mat)
+    if np.any(np.isclose(inv_mat, transpose_mat) == False):
+        return False
     return True
 
 
@@ -217,13 +247,17 @@ def check_is_mirrored(mat):
     @param mat - the matrix
     @return True if the cross product of the transformed axes is [0, 0, -1]"""
 
-    # GUIDE:
+    # TODO:
     #  Step 1: Get the transformed axes using the get_axes_from_matrix
     #  Step 2: Get the cross product of the two matrices (see np.cross). Also make sure you do x, y (order matters for cross product)
     #  Step 3: Check that the resulting vector points in the positive z direction (x and y values are 0, z is positive)
     #  Note: Only the DIRECTION matters - not how long the vector is
     # YOUR CODE HERE
+    x_axis, y_axis = get_axes_from_matrix(mat)
+    cross = np.cross(x_axis, y_axis)
+    return (cross < 0.0)
 
+    
 
 # Check if skewed/not angle-preserving
 #   Normally, robotics only uses combinations of matrices that preserve angles - i.e., the angles between two vectors
@@ -236,13 +270,19 @@ def check_preserves_angles(mat):
     @param mat - the matrix
     @return True if angles are preserved"""
 
-    # GUIDE:
+    # TODO:
     #  Step 1: Get the transformed axes using the get_axes_from_matrix
     #  Step 2: Get the angle between the transformed axes (remember that cos(angle) = dot(u,v) / (||u|| ||v||)
     #    see https://www.wikihow.com/Find-the-Angle-Between-Two-Vectors
     #  Step 3: Check that the angle between them is 90 degrees (reminder, numpy does everything in radians)
     #    Actually, you can just check that the dot product is close to 0
     # YOUR CODE HERE
+    x_axis, y_axis = get_axes_from_matrix(mat)
+    cos_angle = np.dot(x_axis, y_axis) / (np.linalg.norm(x_axis) * np.linalg.norm(y_axis))
+    angle = np.arccos(cos_angle)
+    return(np.isclose(0, np.dot(x_axis,y_axis)))
+
+
 
 
 # Check/test functions for autograder
@@ -357,7 +397,7 @@ def make_pts_representing_circle(n_pts=25):
     @return a 3xn numpy matrix"""
 
     ts = np.linspace(0, np.pi * 2, n_pts)
-    # GUIDE: make a 3 x n_pts array of points for the circle
+    # TODO: make a 3 x n_pts array of points for the circle
     #   These are the x,y points of a unit circle centered at the origin
     #   These are the points that we will draw, both in their original location and in their transformed location
     # Step 1: Make a 3 x n_pts numpy array - I like to use np.ones, because it sets the homogenous coordinate for me
@@ -365,6 +405,9 @@ def make_pts_representing_circle(n_pts=25):
     #   see numpy array math
     # Step 3: Do the same for the y values, but set to sin(t)
     # YOUR CODE HERE
+    pts = np.ones(shape=(3,n_pts))
+    pts[0,:]=np.cos(ts)
+    pts[1,:]=np.sin(ts)
     return pts
 
 
@@ -407,8 +450,9 @@ def plot_axes_and_circle(axs, mat):
     # Draw circle
     axs.plot(pts[0, :], pts[1, :], ':g')
 
-    # GUIDE: Transform circle by mat and put new points in pts_moved
+    # TODO: Transform circle by mat and put new points in pts_moved
     # YOUR CODE HERE
+    pts_moved = mat@pts
     axs.plot(pts_moved[0, :], pts_moved[1, :], ':g')
 
 
@@ -433,6 +477,23 @@ def plot_zigzag(axs, mat):
     axs.plot(pts_moved[0, :], pts_moved[1, :], linestyle='dashed', color='grey')
     return pts
 
+def pts_zigzag(mat):
+    """Plot a zigzag before and after the transform
+    @param axs - figure axes
+    @param mat - the matrix"""
+
+    # zigzag geometry
+    pts = np.ones((3, 5))
+    for i in range(0, 5):
+        if i // 2:
+            pts[0, i] = -1
+        if i % 2:
+            pts[1, i] = -1
+
+    # Draw moved zigzag
+    pts_moved = mat @ pts
+    return pts
+
 
 def example_order_matters():
     """ Make the plot for rotation-translation versus translation-rotation"""
@@ -447,22 +508,37 @@ def example_order_matters():
     plot_axes_and_circle(axs[0, 0], mat)
 
     # Reverse the order of operations
-    # GUIDE: Now create the matrix in the reverse order - try to predict what this will look like
+    # TODO: Now create the matrix in the reverse order - try to predict what this will look like
     #   Set mat to be a translation, rotation matrix (same params as above)
     axs[0, 1].set_title("Trans rot")
     # YOUR CODE HERE
+    seq_rot_trans = [{"type":"translate", "dx": 1, "dy": 2},
+                    {"type":"rotate", "theta": np.pi/4.0}]
+
+    mat = make_matrix_from_sequence(seq_rot_trans)
     plot_axes_and_circle(axs[0, 1], mat)
 
-    # GUIDE Now do a matrix (mat) that is a scale 0.5,2.0, rotate pi/4, translate (1,2)
+    # TODO Now do a matrix (mat) that is a scale 0.5,2.0, rotate pi/4, translate (1,2)
     # YOUR CODE HERE
+    seq_rot_trans = [{"type":"scale", "sx":0.5, "sy":2.0},
+                     {"type":"rotate", "theta": np.pi/4.0},
+                     {"type":"translate", "dx": 1, "dy": 2}]
 
+    mat = make_matrix_from_sequence(seq_rot_trans)
+
+    mat = make_matrix_from_sequence(seq_rot_trans)
     axs[1, 0].set_title("Scl rot trans")
     plot_axes_and_circle(axs[1, 0], mat)
 
     # Reverse the order of operations
-    # GUIDE Now do a matrix (mat) that is the REVERSE of the scale, rotate, translate
+    # TODO Now do a matrix (mat) that is the REVERSE of the scale, rotate, translate
     # YOUR CODE HERE
     axs[1, 1].set_title("Trans rot scl")
+    seq_rot_trans = [{"type":"translate", "dx": 1, "dy": 2},
+                        {"type":"rotate", "theta": np.pi/4.0},
+                        {"type":"scale", "sx":0.5, "sy":2.0}]
+
+    mat = make_matrix_from_sequence(seq_rot_trans)
 
     plot_axes_and_circle(axs[1, 1], mat)
 
@@ -472,25 +548,30 @@ def example_weird_geometry():
     # Make the plot that shows the difference between rotate-translate and translate-rotate
     fig, axs = plt.subplots(1, 2, figsize=(8, 4))
 
-    # GUIDE: Make seq_mirrored so that the x,y axes are flipped, and the x axis is twice as big as it was before.
+    # TODO: Make seq_mirrored so that the x,y axes are flipped, and the x axis is twice as big as it was before.
     #  Draw the the flipped geometry at 2.5 2.5
     #  (see mirrored figure in slides https://docs.google.com/presentation/d/1iTi45y5AghMZRgStPX4mPdR7uYFQdRBjaekOW7ESTxM/edit?usp=sharing)
     # Should be a scale followed by a translate
     # YOUR CODE HERE
+    seq_mirrored = [{"type":"scale", "sx":-2, "sy":1},
+                    {"type":"translate", "dx": 2.5, "dy": 2.5}]
 
     mat = make_matrix_from_sequence(seq_mirrored)
-    # print(f"{mat}")
+    #print(f"{mat}")
     axs[0].set_title("Mirrored")
     plot_axes_and_circle(axs[0], mat)
     plot_zigzag(axs[0], mat)
 
-    # GUIDE: Make seq_skew so that the axes (red blue) are no longer 90 degrees. There are multiple solutions to this, btw.
+    # TODO: Make seq_skew so that the axes (red blue) are no longer 90 degrees. There are multiple solutions to this, btw.
     #  One of the simplest is to rotate then scale x differently than y
     #  Draw the the flipped geometry at 2.5 2.5 (see skewed figure in slides https://docs.google.com/presentation/d/1iTi45y5AghMZRgStPX4mPdR7uYFQdRBjaekOW7ESTxM/edit?usp=sharing)
     # YOUR CODE HERE
+    seq_skew = [{"type":"rotate", "theta": np.pi/4.0},
+                {"type":"scale", "sx":2, "sy":1},
+                {"type":"translate", "dx": 2.5, "dy": 2.5}]
 
     mat = make_matrix_from_sequence(seq_skew)
-    # print(f"{mat}")
+    #print(f"{mat}")
     axs[1].set_title("Skewed")
     plot_axes_and_circle(axs[1], mat)
     plot_zigzag(axs[1], mat)
@@ -504,7 +585,7 @@ def example_uncentered_geometry():
     pts_circle = make_pts_representing_circle(25)
     pts_zigzag = plot_zigzag(axs[0], np.identity(3))
 
-    # GUIDE: create the pts_circle_* and pts_zigzag_* by
+    # TODO: create the pts_circle_* and pts_zigzag_* by
     #  Moving the original geometry so that the origin is at the lower left corner of the circle
     #  Rotating the original geometry so that the x axis is "up"
     # Note: You can use the make_x_matrix commands to move the points
@@ -520,6 +601,21 @@ def example_uncentered_geometry():
     plot_zigzag(axs[0], mat)
     axs[0].set_title("Geometry centered")
 
+    # Second plot - lower left origin
+    seq = [{"type":"translate", "dx":1, "dy":1}]
+    mat_lower = make_matrix_from_sequence(seq)
+    pts_circle_lower_left_origin = mat_lower@pts_circle
+    pts_zigzag_lower_left_origin = mat_lower@pts_zigzag
+
+    # Third plot - rotate Z
+    seq = [{"type":"rotate", "theta": -np.pi/2}]
+    mat_rotate = make_matrix_from_sequence(seq)
+    pts_circle_x_up = pts_circle
+    pts_zigzag_x_up = mat_rotate@pts_zigzag
+
+    # Fourth plot - both
+    pts_circle_x_up_lower_left_origin = mat_lower@pts_circle
+    pts_zigzag_x_up_lower_left_origin = mat_lower@mat_rotate@pts_zigzag
     # Fancy Python looping - create 3 lists, one with the name to put in the title, the second and third
     #   with the three point matrices created above.
     list_names = ['Origin lower left', 'x up', 'x up and lower left origin']
