@@ -335,6 +335,7 @@ class Lab2Driver(Node):
 
         front_width = 0.19
         side_depth = 0.5
+        obs_thresh = 0.5
 
         # Get any front obstacles
         front_scans_idx = [i for i in range(len(y_coords)) if np.abs(y_coords[i]) < front_width and x_coords[i] > 0]
@@ -342,7 +343,7 @@ class Lab2Driver(Node):
         front_scans_x = front_scans_x[front_scans_x > 0]
         min_front = np.min(front_scans_x) if len(front_scans_x) > 0 else np.inf
 
-        obstacle_front = min_front < self.threshold
+        obstacle_front = min_front < obs_thresh
 
         # Now to the left
         left_scans_idx = [i for i in range(len(x_coords)) if (x_coords[i] > 0) and (y_coords[i] > side_depth)]
@@ -350,7 +351,7 @@ class Lab2Driver(Node):
         left_scans_x = left_scans_x[left_scans_x > 0]
         min_left = np.min(left_scans_x) if len(left_scans_x) > 0 else np.inf
 
-        obstacle_left = min_left < self.threshold
+        obstacle_left = min_left < obs_thresh
 
         # Now to the right
         right_scans_idx = [i for i in range(len(x_coords)) if (x_coords[i] > 0) and (y_coords[i] < -side_depth)]
@@ -358,7 +359,7 @@ class Lab2Driver(Node):
         right_scans_x = right_scans_x[right_scans_x > 0]
         min_right = np.min(right_scans_x) if len(right_scans_x) > 0 else np.inf
         
-        obstacle_right = min_right < self.threshold 
+        obstacle_right = min_right < obs_thresh
 
         # Slow down when pretty close (stop if less than .25 m)
         #shortest = np.min(front_scans_x) if len(front_scans_x) > 0 else np.inf
@@ -408,13 +409,7 @@ class Lab2Driver(Node):
 
         # GUIDE:
         #  Step 1) Calculate the angle the robot has to turn to in order to point at the target
-        target_angle = atan2(self.target.point.y, self.target.point.x)
-        distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
-
         #  Step 2) Set your speed based on how far away you are from the target, as before
-        linear_speed = 0.1 * tanh(distance)
-        angular_speed = 0.5 * target_angle
-
         #  Step 3) Add code that veers left (or right) to avoid an obstacle in front of it
         # Reminder: t.linear.x = 0.1    sets the forward speed to 0.1
         #           t.angular.z = pi/2   sets the angular speed to 90 degrees per sec
@@ -428,13 +423,21 @@ class Lab2Driver(Node):
         max_turn = np.pi * 0.1  # This turns about 2 degrees between scans
 
         # YOUR CODE HERE
+        target_angle = atan2(self.target.point.y, self.target.point.x)
+        distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
+
+        #linear_speed = max_speed * tanh(distance)
+        #angular_speed = max_turn * target_angle
+
+        # Speed and turn, no obstacles
+        t.twist.linear.x = np.clip(distance * 0.2, min_speed, max_speed)
+        t.twist.angular.z = np.clip(target_angle * 0.5, -max_turn, max_turn)
+
+        # Adapt if there are obstacles
+        obstacle, avoid_speed, avoid_turn = self.get_obstacle(scan)
         if obstacle:
-            # override with avoidance behavior
             t.twist.linear.x = avoid_speed
             t.twist.angular.z = avoid_turn
-        else:
-            t.twist.linear.x = linear_speed
-            t.twist.angular.z = angular_speed
 
         # t.twist.linear.x = max_speed
         # t.twist.angular.z = 0.0
