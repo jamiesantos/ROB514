@@ -103,6 +103,7 @@ class Lab2Driver(Node):
 
         # GUIDE: Declare any variables here
   # YOUR CODE HERE
+        self.obstacle_close = False
 
         # Timer to make sure we publish the target marker (once we get a goal)
         self.marker_timer = self.create_timer(1.0, self._marker_callback)
@@ -191,11 +192,8 @@ class Lab2Driver(Node):
         @ return true/false """
 
         # YOUR CODE HERE
-        if self.target:
-            # Check if distance from target is within the threshold
-            return sqrt(self.target.point.x**2 + self.target.point.y**2) < self.threshold
-
-        return False
+        distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
+        return distance < self.threshold
 
     def distance_to_target(self):
         """ Communicate with send points - set to distance to target"""
@@ -328,45 +326,25 @@ class Lab2Driver(Node):
   # YOUR CODE HERE
         scan_ranges = np.array(scan.ranges)
         scan_ranges = np.clip(scan_ranges, 0, 10)
-        thetas = np.linspace(scan.angle_min, scan.angle_max, len(scan_ranges))
+        #thetas = np.linspace(scan.angle_min, scan.angle_max, len(scan_ranges))
+        n_scans = len(scan_ranges)
 
-        x_coords = scan_ranges * np.cos(thetas)
-        y_coords = scan_ranges * np.sin(thetas)
+        left  = np.min(scan_ranges[0 : n_scans//3])
+        front = np.min(scan_ranges[n_scans//3 : 2*n_scans//3])
+        right = np.min(scan_ranges[2*n_scans//3 : n_scans])
 
-        front_idx = np.abs(y_coords) < 0.19
-        left_idx = y_coords > 0.19
-        right_idx = y_coords < -0.19
+        obstacle = front < 0.6
 
-        # Get any obstacles
-        front_min = np.min(x_coords[front_idx]) if np.any(front_idx) else 10
-        left_min = np.min(x_coords[left_idx]) if np.any(left_idx) else 10
-        right_min = np.min(x_coords[right_idx]) if np.any(right_idx) else 10
+        if not obstacle:
+            return False, 0.2, 0.0
 
-        obstacle = front_min < 0.5 or left_min < 0.4 or right_min < 0.4
+        # If obstacle, turn away from closest side
+        if left < right:
+            turn = -0.4   # turn right
+        else:
+            turn = 0.4    # turn left
 
-        # Slow down when pretty close (stop if less than .25 m)
-        #shortest = np.min(front_scans_x) if len(front_scans_x) > 0 else np.inf
-        #if shortest < 0.25:
-        #    t.linear.x = 0.0
-        #else:
-        #    t.linear.x = 0.5 * np.tanh(shortest - .5) # 1 m too far, 0.25 bumps corners
-
-        # Default to going forward
-        forward_speed = 0.2
-        angular_turn = 0.0
-
-        # Avoidance rules
-        if front_min < 0.5:
-            forward_speed = 0.0
-            angular_turn = 0.3 if left_min > right_min else -0.3
-        elif left_min < 0.4:
-            forward_speed = 0.05
-            angular_turn = -0.3
-        elif right_min < 0.4:
-            forward_speed = 0.05
-            angular_turn = 0.3
-
-        return obstacle, forward_speed, angular_turn
+        return True, 0.0, turn
 
     def get_twist(self, scan):
         """This is the method that calculate the twist
@@ -391,34 +369,21 @@ class Lab2Driver(Node):
         max_turn = np.pi * 0.1  # This turns about 2 degrees between scans
 
         # YOUR CODE HERE
-        target_angle = atan2(self.target.point.y, self.target.point.x)
-        distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
-
-        # Clamp turn so we don't over-rotate
-        turn_cmd = np.clip(target_angle * 1.0, -max_turn, max_turn)
-
-        # Forward speed reduces when turning sharply or close to goal
-        speed_cmd = np.clip(max_speed * (1.0 - fabs(turn_cmd) / max_turn), min_speed, max_speed)
-
-        # Speed and turn, no obstacles
-        #t.twist.linear.x = np.clip(distance * 0.2, min_speed, max_speed)
-        #t.twist.angular.z = np.clip(target_angle * 0.5, -max_turn, max_turn)
-
-        # Adapt if there are obstacles
-        obstacle, avoid_speed, avoid_turn = self.get_obstacle(scan)
         if obstacle:
             t.twist.linear.x = avoid_speed
             t.twist.angular.z = avoid_turn
-        else:
-            t.twist.linear.x = speed_cmd
-            t.twist.angular.z = turn_cmd
-        # t.twist.linear.x = max_speed
-        # t.twist.angular.z = 0.0
+            return t
 
-        # If very close, stop completely
-        if distance < self.threshold:
-            t.twist.linear.x = 0.0
-            t.twist.angular.z = 0.0
+        target_angle = atan2(self.target.point.y, self.target.point.x)
+        distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
+
+        t.twist.angular.z = np.clip(target_angle, -0.5, 0.5)
+
+        speed = min(0.3, distance * 0.3)
+        if abs(target_angle) > 1.0:  # if target behind or sideways, don’t drive forward
+            speed = 0.0
+
+        t.twist.linear.x = speed
         self.get_logger().info(f"Setting twist forward {t.twist.linear.x} angle {t.twist.angular.z}")
         return t            
 
