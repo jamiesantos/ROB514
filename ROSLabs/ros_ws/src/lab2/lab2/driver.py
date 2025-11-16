@@ -193,6 +193,8 @@ class Lab2Driver(Node):
 
         # YOUR CODE HERE
         distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
+        if distance < self.threshold:
+            print ("DISTANCE: " + str(distance))
         return distance < self.threshold
 
     def distance_to_target(self):
@@ -333,16 +335,16 @@ class Lab2Driver(Node):
         front = np.min(scan_ranges[n_scans//3 : 2*n_scans//3])
         right = np.min(scan_ranges[2*n_scans//3 : n_scans])
 
-        obstacle = front < 0.6
+        obstacle = front < 1.0
 
         if not obstacle:
-            return False, 0.2, 0.0
+            return False, 0.4, 0.0
 
         # If obstacle, turn away from closest side
         if left < right:
-            turn = -0.4   # turn right
+            turn = 0.4   # turn right
         else:
-            turn = 0.4    # turn left
+            turn = -0.4    # turn left
 
         return True, 0.0, turn
 
@@ -365,8 +367,8 @@ class Lab2Driver(Node):
         obstacle, avoid_speed, avoid_turn = self.get_obstacle(scan)
 
         min_speed = 0.05
-        max_speed = 0.2         # This moves about 0.01 m between scans
-        max_turn = np.pi * 0.1  # This turns about 2 degrees between scans
+        max_speed = 0.4
+        max_turn = np.pi * 0.1
 
         # YOUR CODE HERE
         if obstacle:
@@ -379,9 +381,10 @@ class Lab2Driver(Node):
 
         t.twist.angular.z = np.clip(target_angle, -0.5, 0.5)
 
-        speed = min(0.3, distance * 0.3)
-        if abs(target_angle) > 1.0:  # if target behind or sideways, don’t drive forward
+        if abs(target_angle) > np.pi/3:
             speed = 0.0
+        else:
+            speed = max_speed * np.tanh(distance)
 
         t.twist.linear.x = speed
         self.get_logger().info(f"Setting twist forward {t.twist.linear.x} angle {t.twist.angular.z}")
