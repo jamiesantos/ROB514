@@ -333,33 +333,16 @@ class Lab2Driver(Node):
         x_coords = scan_ranges * np.cos(thetas)
         y_coords = scan_ranges * np.sin(thetas)
 
-        front_width = 0.19
-        side_depth = 0.5
-        obs_thresh = 0.5
+        front_idx = np.abs(y_coords) < 0.19
+        left_idx = y_coords > 0.19
+        right_idx = y_coords < -0.19
 
-        # Get any front obstacles
-        front_scans_idx = [i for i in range(len(y_coords)) if np.abs(y_coords[i]) < front_width and x_coords[i] > 0]
-        front_scans_x = x_coords[front_scans_idx]
-        front_scans_x = front_scans_x[front_scans_x > 0]
-        min_front = np.min(front_scans_x) if len(front_scans_x) > 0 else np.inf
+        # Get any obstacles
+        front_min = np.min(x_coords[front_idx]) if np.any(front_idx) else 10
+        left_min = np.min(x_coords[left_idx]) if np.any(left_idx) else 10
+        right_min = np.min(x_coords[right_idx]) if np.any(right_idx) else 10
 
-        obstacle_front = min_front < obs_thresh
-
-        # Now to the left
-        left_scans_idx = [i for i in range(len(x_coords)) if (x_coords[i] > 0) and (y_coords[i] > side_depth)]
-        left_scans_x = x_coords[left_scans_idx]
-        left_scans_x = left_scans_x[left_scans_x > 0]
-        min_left = np.min(left_scans_x) if len(left_scans_x) > 0 else np.inf
-
-        obstacle_left = min_left < obs_thresh
-
-        # Now to the right
-        right_scans_idx = [i for i in range(len(x_coords)) if (x_coords[i] > 0) and (y_coords[i] < -side_depth)]
-        right_scans_x = x_coords[right_scans_idx]
-        right_scans_x = right_scans_x[right_scans_x > 0]
-        min_right = np.min(right_scans_x) if len(right_scans_x) > 0 else np.inf
-        
-        obstacle_right = min_right < obs_thresh
+        obstacle = front_min < 0.5 or left_min < 0.4 or right_min < 0.4
 
         # Slow down when pretty close (stop if less than .25 m)
         #shortest = np.min(front_scans_x) if len(front_scans_x) > 0 else np.inf
@@ -368,37 +351,22 @@ class Lab2Driver(Node):
         #else:
         #    t.linear.x = 0.5 * np.tanh(shortest - .5) # 1 m too far, 0.25 bumps corners
 
-        turn_speed = 0.25
-        forward_speed = 0.25
-        if not (obstacle_front or obstacle_left or obstacle_right):
-            return False, forward_speed, 0.0
+        # Default to going forward
+        forward_speed = 0.2
+        angular_turn = 0.0
 
-        # At least one region is blocked -> produce avoidance command
-        # If front blocked, prioritize escaping front:
-        if obstacle_front:
-            # if left is freer than right, turn left (positive angular z), else turn right
-            left_clearance = min_left
-            right_clearance = min_right
-            if left_clearance > right_clearance and left_clearance > self.threshold:
-                # left is clearer
-                return True, 0.0, turn_speed
-            elif right_clearance > left_clearance and right_clearance > self.threshold:
-                # right is clearer
-                return True, 0.0, -turn_speed
-            else:
-                # both sides relatively blocked (or no side is clearly better) => rotate in place
-                return True, 0.0, turn_speed  # arbitrary choice to turn left
+        # Avoidance rules
+        if front_min < 0.5:
+            forward_speed = 0.0
+            angular_turn = 0.3 if left_min > right_min else -0.3
+        elif left_min < 0.4:
+            forward_speed = 0.05
+            angular_turn = -0.3
+        elif right_min < 0.4:
+            forward_speed = 0.05
+            angular_turn = 0.3
 
-        # If front not blocked but left or right blocked, do a slight steering adjustment while moving
-        # e.g., if left blocked, steer right a bit while moving forward
-        small_turn = turn_speed * 0.6
-        if obstacle_left and not obstacle_right:
-            return True, max(0.0, forward_speed * 0.5), -small_turn
-        if obstacle_right and not obstacle_left:
-            return True, max(0.0, forward_speed * 0.5), small_turn
-
-        # If both sides blocked but front is clear (rare), stop and pick a turn
-        return True, 0.0, turn_speed
+        return obstacle, forward_speed, angular_turn
 
     def get_twist(self, scan):
         """This is the method that calculate the twist
@@ -426,21 +394,31 @@ class Lab2Driver(Node):
         target_angle = atan2(self.target.point.y, self.target.point.x)
         distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
 
-        #linear_speed = max_speed * tanh(distance)
-        #angular_speed = max_turn * target_angle
+        # Clamp turn so we don't over-rotate
+        turn_cmd = np.clip(target_angle * 1.0, -max_turn, max_turn)
+
+        # Forward speed reduces when turning sharply or close to goal
+        speed_cmd = np.clip(max_speed * (1.0 - fabs(turn_cmd) / max_turn), min_speed, max_speed)
 
         # Speed and turn, no obstacles
-        t.twist.linear.x = np.clip(distance * 0.2, min_speed, max_speed)
-        t.twist.angular.z = np.clip(target_angle * 0.5, -max_turn, max_turn)
+        #t.twist.linear.x = np.clip(distance * 0.2, min_speed, max_speed)
+        #t.twist.angular.z = np.clip(target_angle * 0.5, -max_turn, max_turn)
 
         # Adapt if there are obstacles
         obstacle, avoid_speed, avoid_turn = self.get_obstacle(scan)
         if obstacle:
             t.twist.linear.x = avoid_speed
             t.twist.angular.z = avoid_turn
-
+        else:
+            t.twist.linear.x = speed_cmd
+            t.twist.angular.z = turn_cmd
         # t.twist.linear.x = max_speed
         # t.twist.angular.z = 0.0
+
+        # If very close, stop completely
+        if distance < self.threshold:
+            t.twist.linear.x = 0.0
+            t.twist.angular.z = 0.0
         self.get_logger().info(f"Setting twist forward {t.twist.linear.x} angle {t.twist.angular.z}")
         return t            
 
