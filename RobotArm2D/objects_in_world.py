@@ -119,6 +119,8 @@ def get_pts_as_numpy_array(obj):
     # GUIDE: Create a 3xn numpy array, with the last row 1's, and the points filled
     #  in from the obj["XYs"] key-value
     # YOUR CODE HERE
+    pts = np.array(obj["XYs"]).T
+    pts = np.vstack((pts, np.ones((1, pts.shape[1]))))
     return pts
 
 
