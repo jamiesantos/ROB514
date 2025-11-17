@@ -331,13 +331,13 @@ class Lab2Driver(Node):
         #thetas = np.linspace(scan.angle_min, scan.angle_max, len(scan_ranges))
         n_scans = len(scan_ranges)
 
-        left  = np.min(scan_ranges[0 : n_scans//3])
-        front = np.min(scan_ranges[n_scans//3 : 2*n_scans//3])
-        right = np.min(scan_ranges[2*n_scans//3 : n_scans])
+        left  = np.min(scan_ranges[0 : np.floor(n_scans / 3)])
+        front = np.min(scan_ranges[np.floor(n_scans / 3) : 2*np.floor(n_scans / 3)])
+        right = np.min(scan_ranges[2 * np.floor(n_scans / 3) : n_scans])
 
-        obstacle = front < 1.0
-
-        if not obstacle:
+        if not front < 1.0: # or self.distance_to_target() < self.threshold:
+            #print(self.distance_to_target())
+            #print(self.threshold)
             return False, 0.4, 0.0
 
         # If obstacle, turn away from closest side
@@ -379,7 +379,8 @@ class Lab2Driver(Node):
         target_angle = atan2(self.target.point.y, self.target.point.x)
         distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
 
-        t.twist.angular.z = np.clip(target_angle, -0.5, 0.5)
+        # Angular velocity proportional to angle (pos v for pos angle, neg v for neg angle)
+        t.twist.angular.z = np.clip(target_angle, -max_turn, max_turn)
 
         if abs(target_angle) > np.pi/3:
             speed = 0.0
