@@ -41,6 +41,7 @@ def practice_jacobian():
     # TODO: Create a 3D vector to the end point (r cos(theta), r sin(theta), 0)
     #   Needs to be 3D for cross product to work
     # YOUR CODE HERE
+    r = np.array([pt_end[0], pt_end[1], 0])
 
     # The z vector we spin around
     omega_hat = [0, 0, 1]
@@ -49,7 +50,7 @@ def practice_jacobian():
     #  The result should always be 0 in 3rd component for a 2D vector
     #  Order matters for cross products...
     # YOUR CODE HERE
-
+    cross = np.cross(omega_hat, r)
 
     # TODO: Build the Jacobian, which in this case is a 2x1 matrix
     # This matrix takes changes in the angles to changes in x,y
@@ -57,6 +58,7 @@ def practice_jacobian():
     # TODO: Set the column of the matrix to be omega hat cross r
     jacobian_matrix = np.zeros([2, 1])
     # YOUR CODE HERE
+    jacobian_matrix[:, 0] = cross[:2]
 
     # Now we'll set up a linear equation solve that looks like
     #  A x = b  (np.linalg.lstsq)
@@ -68,12 +70,16 @@ def practice_jacobian():
     # Desired x,y change
     b_matrix = np.zeros([2, 1])
     # YOUR CODE HERE
+    dx = -0.01   # Change to match autograder
+    dy = -0.1
+    b_matrix = np.array([[dx], [dy]])
     pt_new_end = [pt_end[0] - 0.01, pt_end[1] - 0.1]
 
     # TODO: Solve the matrix using np.linalg.lstsq. Should return a 1x1 matrix with an angle change
     #   Note: Use rcond=None
     d_ang = np.zeros([1, 1])
     # YOUR CODE HERE
+    d_ang = np.linalg.lstsq(jacobian_matrix, b_matrix, rcond=None)[0]
 
     # Check result of solve - should be the same as dx_dy
     res = jacobian_matrix @ d_ang[0]
@@ -115,9 +121,76 @@ def calculate_jacobian_numerically(arm, angles):
     # Step 3: Do the wrist/gripper angle the same way (but remember, that angle
     #   is stored in angles[-1][0])
     # YOUR CODE HERE
+    afk.set_angles_of_arm_geometry(arm, angles)
+    x, y = afk.get_gripper_location(arm)
+    #x,y = gripper_location(arm, angles)
+
+    for i in range(len(arm) -2):
+        angles[i] += h
+        afk.set_angles_of_arm_geometry(arm, angles)
+        x_new, y_new = afk.get_gripper_location(arm)
+        angles[i] -= h
+        jacob[:,i] = [(x_new - x) / h, (y_new - y) / h]
+
+    # The wrist/gripper angle
+    angles[-1][0] += h
+    afk.set_angles_of_arm_geometry(arm, angles)
+    x_new, y_new = afk.get_gripper_location(arm)
+    angles[-1][0] -= h
+    jacob[:, -1] = [(x_new - x) / h, (y_new - y) / h]
+
     return jacob
 
 def calculate_jacobian(arm, angles):
+    """
+    Calculate the Jacobian using cumulative angles.
+    Each column = omega_hat x r, where r = position(end) - position(joint).
+    Works backwards from the wrist using reversed length/angle lists.
+    """
+    # One column per actuated joint (ignore the base)
+    jacob = np.zeros([2, len(arm) - 1])
+
+    # Link lengths (ignore base), append gripper grasp length
+    lengths_links = [link["Arm length"] for link in arm[1:-1]]
+    lengths_links.append(arm[-1][0]["Grasp"])
+
+    # Reverse so we work from wrist backward
+    lengths_links = list(reversed(lengths_links))
+    angles_links = list(reversed([a for a in angles[:-1]] + [angles[-1][0]]))
+
+    # Base rotation adjustment (arm points up)
+    angles_links[-1] += np.pi / 2.0
+
+    # cumulative angles (sum up to each reversed link)
+    cum_angles = np.cumsum(angles_links)
+
+    # accumulate local transforms (working backwards)
+    mat_accum = np.identity(3)
+    omega_hat = np.array([0.0, 0.0, 1.0])
+
+    # iterate through reversed links; place wrist in last column etc.
+    for i, (ang, length) in enumerate(zip(angles_links, lengths_links)):
+        # update accumulated matrix: rotate by this joint, then translate along its local x
+        R = mt.make_rotation_matrix(ang)
+        T = mt.make_translation_matrix(length, 0.0)
+        mat_accum = R @ T @ mat_accum
+
+        # rotate that accumulated frame by the cumulative angle up to this joint
+        R_cum = mt.make_rotation_matrix(cum_angles[i])
+        mat_r = R_cum @ mat_accum
+
+        # r is the position (last column) in homogeneous coordinates
+        r = np.array([mat_r[0, 2], mat_r[1, 2], mat_r[2, 2]])
+
+        # jacobian column = omega x r (take only x,y components)
+        col = np.cross(omega_hat, r)[:2]
+
+        # put into the proper column: wrist should go to last column, so index = n-1-i
+        jacob[:, (len(arm) - 2) - i] = col
+
+    return jacob
+
+def calculate_jacobian_temp(arm, angles):
     """
     Calculate the Jacobian from the given angles and the lengths in the arm
     Start with the wrist and work *backwards*, calculating Ri @ Ti @ previous_matrix
@@ -139,6 +212,8 @@ def calculate_jacobian(arm, angles):
 
     # TODO: reverse the length list, make the reversed angles list from angles
     # YOUR CODE HERE
+    lengths_links = list(reversed(lengths_links))
+    angles_links = list(reversed(angles[:len(lengths_links)]))
 
     # We rotated the base so the arm points up - so the last link angle needs to have that rotation added
     angles_links[-1] += np.pi / 2.0
@@ -153,6 +228,7 @@ def calculate_jacobian(arm, angles):
 
     # More python-ese - this gets each of the angles/lengths AND an enumeration variable i
     total_angles = np.sum(np.array(angles_links))
+    angle_sums = np.cumsum(angles_links)
     for i, (ang, length) in enumerate(zip(angles_links, lengths_links)):
         # TODO:
         #   mat_accum is updated by rot(angle) @ trans(length, 0) @ mat_accum
@@ -163,8 +239,16 @@ def calculate_jacobian(arm, angles):
         #       Do omega_hat cross r
         #    Put the result in the n-i column in jacob - i.e., wrist should go in the last column in jacob
         # YOUR CODE HERE
-    return jacob
+        R = make_rotation_matrix(ang)
+        T = make_translation_matrix(length, 0)
+        mat_accum = R @ T @ mat_accum
+        mat_r = make_rotation_matrix(angle_sums[i]) @ mat_accum
+        r = mat_r[:, -1]
+        result = np.array([r[0], r[1], 0.0])
 
+        cross = np.cross(omega_hat, result)
+        jacob[:, len(lengths_links)-1 -i] = cross[:2]
+    return jacob
 
 def solve_jacobian(jacobian, vx_vy):
     """ Do the pseudo inverse of the jacobian
@@ -175,8 +259,9 @@ def solve_jacobian(jacobian, vx_vy):
     # TODO: Call numpy's linear algebra least squares (linalg.lstsq) routine to calculate A x = b
     # Reminder: lstsq returns a tuple. See docs. The returned matrix is in the first part of the tuple
     # YOUR CODE HERE
-    return delta_angles
+    delta_angles = np.linalg.lstsq(jacobian, vx_vy, rcond=None)[0]
 
+    return delta_angles
 
 def jacobian_follow_path(arm, angles, target, b_one_step=True):
     """
@@ -210,6 +295,7 @@ def jacobian_follow_path(arm, angles, target, b_one_step=True):
 
     d_step = 0.05
     while b_keep_going and count_iterations < 1000:
+    #while count_iterations < 1000:
 
         # This is the vector to the target. Take maximum 0.05 of a step towards the target
         vec_to_target = ik_gradient.vector_to_goal(arm, target)
@@ -228,6 +314,9 @@ def jacobian_follow_path(arm, angles, target, b_one_step=True):
 
         delta_angles = np.zeros(len(angles))
         # YOUR CODE HERE
+        jacobian = calculate_jacobian_numerically(arm, angles)
+        delta = solve_jacobian(jacobian, vec_to_target)
+        delta_angles[:len(delta)] = delta
 
         # This rarely happens - but if the matrix is degenerate (the arm is in a straight line) then the angles
         #  returned from solve_jacobian will be really, really big. The while loop below will "fix" this, but this
@@ -256,9 +345,13 @@ def jacobian_follow_path(arm, angles, target, b_one_step=True):
             #  Calculate what the new distance would be with those angles
             new_angles = []
             # YOUR CODE HERE
+            for i, angle in enumerate(angles):
+                new_angles.append(angle + step_size * delta_angles[i])
+
+            saved_angles = angles.copy()
             # Get the new distance with the new angles
             afk.set_angles_of_arm_geometry(arm, new_angles)
-            new_dist = ik_gradient.distance_to_goal(arm, target)
+            new_distance = ik_gradient.distance_to_goal(arm, target)
 
             # TODO:
             #   If the new distance is larger than the best distance, decrease the step size (I suggest cutting it in half)
@@ -266,6 +359,17 @@ def jacobian_follow_path(arm, angles, target, b_one_step=True):
             #     set angles to be new_angles and best_distance to be new_distance
             #     set b_found_better to be True
             # YOUR CODE HERE
+
+            afk.set_angles_of_arm_geometry(arm, saved_angles)
+
+            if new_distance > best_distance:
+                step_size *= 0.5
+            else:
+                b_took_one_step = True
+                angles = new_angles
+                best_distance = new_distance
+                b_found_better = True
+
             # Count iterations
             count_iterations += 1
 
