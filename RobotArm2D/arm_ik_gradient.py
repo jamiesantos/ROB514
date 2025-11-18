@@ -147,7 +147,7 @@ def gradient_descent(arm, angles, target, b_one_step=True) -> tuple:
         # TODO: Calculate the gradient with angles (don't for get to set the angles first)
         # YOUR CODE HERE
         gradient = calculate_gradient(arm, angles, target)
-        
+
         # This is the while loop where you keep "shrinking" the step size until you get closer to the goal (if
         #  you ever do)
         # Again, use a Boolean to tag if you actually got better
@@ -175,7 +175,7 @@ def gradient_descent(arm, angles, target, b_one_step=True) -> tuple:
 
             # Now we see how we did
             afk.set_angles_of_arm_geometry(arm, new_angles)
-            new_distance = distance_to_goal(arm, target)
+            new_dist = distance_to_goal(arm, target)
 
             # TODO:
             #   If the new distance is larger than the best distance, decrease the step size (I suggest cutting it in half)
@@ -183,13 +183,13 @@ def gradient_descent(arm, angles, target, b_one_step=True) -> tuple:
             #     set angles to be new_angles and best_distance to be new_distance
             #     set b_found_better to be True
             # YOUR CODE HERE
-            if new_distance < best_distance:
+            if new_dist < best_distance:
                 b_took_one_step = True
                 angles = new_angles
-                best_distance = new_distance
+                best_distance = new_dist
                 b_found_better = True
             else:
-                step_size /= 2              # Reduce step size and try again
+                step_size /= 2
 
             # Count iterations
             count_iterations += 1

@@ -87,9 +87,9 @@ def practice_jacobian():
     # The actual point you end up at if you change the angle by that much
     pt_moved = [radius * np.cos(theta + d_ang[0][0]), radius * np.sin(theta + d_ang[0][0])]
 
-    print(f"Delta angle {d_ang[0]}, should be -0.32")
-    print(f"New point and moved point should be the close to the same")
-    print(f"Old point: {pt_end}\nNew pt: {pt_new_end}\nMoved pt: {pt_moved}")
+    #print(f"Delta angle {d_ang[0]}, should be -0.32")
+    #print(f"New point and moved point should be the close to the same")
+    #print(f"Old point: {pt_end}\nNew pt: {pt_new_end}\nMoved pt: {pt_moved}")
 
     return d_ang
 
@@ -188,66 +188,6 @@ def calculate_jacobian(arm, angles):
         # put into the proper column: wrist should go to last column, so index = n-1-i
         jacob[:, (len(arm) - 2) - i] = col
 
-    return jacob
-
-def calculate_jacobian_temp(arm, angles):
-    """
-    Calculate the Jacobian from the given angles and the lengths in the arm
-    Start with the wrist and work *backwards*, calculating Ri @ Ti @ previous_matrix
-    The vector r from the practice Jacobian problem above is just the last column of that matrix
-    This nethod is OPTIONAL, but should return the same thing as calculate_jacobian_numerically
-    @param arm - The arm geometry, as constructed in arm_forward_kinematics
-    @param angles - A list of angles for each link, followed by a triplet for the wrist and fingers
-    @return 2xn Jacobian matrix that maps changes in angles to changes in x,y """
-
-    # One column for each link plus the wrist (ignores base)
-    jacob = np.zeros([2, len(arm) - 1])
-
-    # TODO: To make things simpler, first build two lists that have the link lengths and angles in REVERSE order
-    # Note that python has a handy reverse method for lists
-    #  This is Python-ese for getting out the lengths from the list of dictionaries
-    #  Don't forget the wrist
-    lengths_links = [link["Arm length"] for link in arm[1:-1]]
-    lengths_links.append(arm[-1][0]["Grasp"])
-
-    # TODO: reverse the length list, make the reversed angles list from angles
-    # YOUR CODE HERE
-    lengths_links = list(reversed(lengths_links))
-    angles_links = list(reversed(angles[:len(lengths_links)]))
-
-    # We rotated the base so the arm points up - so the last link angle needs to have that rotation added
-    angles_links[-1] += np.pi / 2.0
-
-    # TODO: Now work backwards, calculating R @ T @ mat_accum
-    #   In each iteration, update mat_accum THEN multiply by the rotation up
-    #    to that joing and THEN extract the vector r then do omega_hat cross r and put the result in the
-    #    column of the matrix
-    mat_accum = np.identity(3)
-    # The z vector we spin around
-    omega_hat = [0, 0, 1]
-
-    # More python-ese - this gets each of the angles/lengths AND an enumeration variable i
-    total_angles = np.sum(np.array(angles_links))
-    angle_sums = np.cumsum(angles_links)
-    for i, (ang, length) in enumerate(zip(angles_links, lengths_links)):
-        # TODO:
-        #   mat_accum is updated by rot(angle) @ trans(length, 0) @ mat_accum
-        #     This gets the end point for all the links, working backwards from the wrist
-        #   To get r, you need to rotate this by the sum of all the angles UP TO this angle
-        #      mat_r = rot(sum all link angles up to this angle) @ mat_accum
-        #     Get r from mat_r (the last column)
-        #       Do omega_hat cross r
-        #    Put the result in the n-i column in jacob - i.e., wrist should go in the last column in jacob
-        # YOUR CODE HERE
-        R = make_rotation_matrix(ang)
-        T = make_translation_matrix(length, 0)
-        mat_accum = R @ T @ mat_accum
-        mat_r = make_rotation_matrix(angle_sums[i]) @ mat_accum
-        r = mat_r[:, -1]
-        result = np.array([r[0], r[1], 0.0])
-
-        cross = np.cross(omega_hat, result)
-        jacob[:, len(lengths_links)-1 -i] = cross[:2]
     return jacob
 
 def solve_jacobian(jacobian, vx_vy):
