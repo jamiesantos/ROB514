@@ -201,19 +201,43 @@ def dijkstra(im, robot_loc, goal_loc):
         #  Lec : Planning, at the end
         #  https://docs.google.com/presentation/d/1pt8AcSKS2TbKpTAVV190pRHgS_M38ldtHQHIltcYH6Y/edit#slide=id.g18d0c3a1e7d_0_0
         # YOUR CODE HERE
+        if current_node_ij == goal_loc:
+            break
+        elif visited[current_node_ij][2]:
+            continue
+        else:
+             visited[current_node_ij] = (visited_distance, visited_parent, True)
+
+        # Check each neighbor
+        for neighbor in four_connected(current_node_ij):
+            i = neighbor[0]
+            j = neighbor[1]
+            if not is_free(im, (i, j)):
+                continue
+            cost = distance_to_current_node + 1
+            if neighbor not in visited or cost < visited[neighbor][0]:
+                visited[neighbor] = (cost, current_node_ij, False)
+                heapq.heappush(priority_queue, (cost, neighbor))
+
 
     # Now check that we actually found the goal node
     try_2 = goal_loc
     if not goal_loc in visited:
         # GUIDE: Deal with not being able to get to the goal loc
         # YOUR CODE HERE
-        raise ValueError(f"Goal {goal_loc} not reached")
-        return []
+        print("Goal unreachable :-(")
+        return None
 
     path = []
     path.append(goal_loc)
     # GUIDE: Build the path by starting at the goal node and working backwards
     # YOUR CODE HERE
+
+    curr = goal_loc
+    while curr:
+        path.append(curr)
+        curr = visited[curr][1]
+    path.reverse()
 
     return path
 
