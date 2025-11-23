@@ -61,8 +61,21 @@ class RobotGroundTruth:
         #   Set self.move_probabilities["move_left"] = {...} to be a dictionary with the above probabilities
         #     Yes, you can store dictionaries in dictionaries
         # Check that the probabilities sum to one and are between 0 and 1
-
         # YOUR CODE HERE
+        stay = 1 - (move_left + move_right)
+
+        if move_left + move_right + stay > 1:
+            raise ValueError("Probabilities greater than 1")
+        if move_left < 0 or move_right < 0 or stay < 0:
+            raise ValueError("Probability cannot be negative")
+        if move_left > 1 or move_right > 1 or stay > 1:
+            raise ValueError("Probability cannot be > 1")
+
+        self.move_probabilities["move_left"] = {
+            "left": move_left,
+            "right": move_right,
+            "stay": stay
+        }
 
     def set_move_right_probabilities(self, move_left=0.05, move_right=0.8):
         """ Set the three discrete probabilities for moving right (should sum to one and all be positive)
@@ -76,6 +89,20 @@ class RobotGroundTruth:
         # Check that the probabilities sum to one and are between 0 and 1
 
         # YOUR CODE HERE
+        stay = 1 - (move_left + move_right)
+
+        if move_left + move_right + stay > 1:
+            raise ValueError("Probabilities greater than 1")
+        if move_left < 0 or move_right < 0 or stay < 0:
+            raise ValueError("Probability cannot be negative")
+        if move_left > 1 or move_right > 1 or stay > 1:
+            raise ValueError("Probability cannot be > 1")
+
+        self.move_probabilities["move_right"] = {
+            "left": move_left,
+            "stay": stay,
+            "right": move_right
+        }
 
     def set_move_continuos_probabilities(self, sigma=0.1):
         """ Set the noise for continuous movement
@@ -136,6 +163,15 @@ class RobotGroundTruth:
         step_dir = 0
 
         # YOUR CODE HERE
+        probs_move_left = self.move_probabilities["move_left"]
+        draw = np.random.rand()
+
+        if draw < probs_move_left["left"]:
+            step_dir = -1
+        elif draw < probs_move_left["left"] + probs_move_left["stay"]:
+            step_dir = 0
+        else:
+            step_dir = 1
 
         # This returns the actual move amount, clamped to 0, 1
         #   i.e., don't run off the end of the hallway
@@ -151,6 +187,16 @@ class RobotGroundTruth:
         step_dir = 0
 
         # YOUR CODE HERE
+        probs_move_right = self.move_probabilities["move_right"]
+        draw = np.random.rand()
+
+        if draw < probs_move_right["left"]:
+            step_dir = -1
+        elif draw < probs_move_right["left"] + probs_move_right["stay"]:
+            step_dir = 0
+        else:
+            step_dir = 1
+
 
         return self._move_clamped_discrete(step_dir * step_size)
 

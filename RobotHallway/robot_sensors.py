@@ -24,6 +24,12 @@ class RobotSensors:
         # Second note: all variables should be referenced with self. or they will disappear
         # YOUR CODE HERE
 
+        # Bayes filter:
+        self.door_sensor_probabilities = {
+            "door": {},
+            "no_door": {}
+        }
+
         # In the GUI version, these will be called with values from the GUI after the RobotSensors instance
         #   has been created
         # Actually SET the values for the dictionaries
@@ -40,6 +46,17 @@ class RobotSensors:
         #  Reminder: You should have created the dictionary to hold the dictionaries in the __init__ method above
         #  Second note: all variables should be referenced with self.
         # YOUR CODE HERE
+        self.door_sensor_probabilities = {
+        "door": {
+            True: in_prob_see_door_if_door,
+            False: (1 - in_prob_see_door_if_door)
+        },
+
+        "no_door": {
+            True: in_prob_see_door_if_not_door,
+            False: (1 - in_prob_see_door_if_not_door)
+        }
+    }
 
     def set_distance_wall_sensor_probabilities(self, sigma=0.1):
         """ Setup the wall sensor probabilities (store them in the dictionary)
@@ -71,6 +88,17 @@ class RobotSensors:
         # STEP 2 - use the random number (and your first if statement) to determine if you should return True or False
         # Note: This is just the sample_boolean code from your probabilities assignment
         # YOUR CODE HERE
+        rand_num = np.random.rand()
+
+        if is_in_front_of_door:
+            probabilities = self.door_sensor_probabilities["door"]
+        else:
+            probabilities = self.door_sensor_probabilities["no_door"]
+
+        if rand_num < probabilities[True]:
+            return True
+        else:
+            return False
 
     def query_distance_to_wall(self, robot_gt):
         """ Return a distance reading (with correct noise) of the robot's location
