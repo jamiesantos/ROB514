@@ -55,10 +55,9 @@ class BayesFilter:
         #  for i, p in enumerate(self.probabilities):
         # YOUR CODE HERE
         new_probabilities = []
-        n_bins = len(self.probabilities)
 
         for i, p_x in enumerate(self.probabilities):
-            bin_center = (i + 0.5) * (1.0 / n_bins)
+            bin_center = (i + 0.5) * (1.0 / len(self.probabilities))
             door = world_ground_truth.is_location_in_front_of_door(bin_center)
 
             if door:
@@ -68,8 +67,8 @@ class BayesFilter:
 
             new_probabilities.append(p_y_x * p_x)
 
-        self.probabilities = [p / sum(new_probabilities) for p in new_probabilities]
-
+        total = sum(new_probabilities)
+        self.probabilities = [p / total for p in new_probabilities]
 
     def update_belief_move_left(self, robot_ground_truth):
         """ Update the probabilities assuming a move left.
@@ -91,23 +90,13 @@ class BayesFilter:
         new_probabilities = [0.0]*n
         transition = robot_ground_truth.move_probabilities["move_left"]
         for i, prev in enumerate(self.probabilities):
+            left = i - 1 if i > 0 else 0
+            right = i + 1 if i < n - 1 else n - 1
 
-            # i moves LEFT → goes to i-1
-            left_i = i - 1
-            if left_i < 0:
-                left_i = 0
-            new_probabilities[left_i] += prev * transition["left"]
-
-            # i STAYS → goes to i
+            new_probabilities[left] += prev * transition["left"]
             new_probabilities[i] += prev * transition["stay"]
+            new_probabilities[right] += prev * transition["right"]
 
-            # i moves RIGHT → goes to i+1
-            right_i = i + 1
-            if right_i >= n:
-                right_i = n - 1
-            new_probabilities[right_i] += prev * transition["right"]
-
-        # Normalize (numerical)
         total = sum(new_probabilities)
         self.probabilities = [p / total for p in new_probabilities]
 
@@ -120,29 +109,18 @@ class BayesFilter:
         # bayes assignment
         # YOUR CODE HERE
         n = len(self.probabilities)
-        new_probs = [0.0] * n
+        new_probabilities = [0.0]*n
+        transition = robot_ground_truth.move_probabilities["move_right"]
+        for i, prev in enumerate(self.probabilities):
+            left = i - 1 if i > 0 else 0
+            right = i + 1 if i < n - 1 else n - 1
 
-        trans = robot_ground_truth.move_probabilities["move_right"]
+            new_probabilities[left] += prev * transition["left"]
+            new_probabilities[i] += prev * transition["stay"]
+            new_probabilities[right] += prev * transition["right"]
 
-        for i, p_prev in enumerate(self.probabilities):
-
-            # i moves LEFT → bin i-1
-            left_i = i - 1
-            if left_i < 0:
-                left_i = 0
-            new_probs[left_i] += p_prev * trans["left"]
-
-            # stays → bin i
-            new_probs[i] += p_prev * trans["stay"]
-
-            # moves RIGHT → bin i+1
-            right_i = i + 1
-            if right_i >= n:
-                right_i = n - 1
-            new_probs[right_i] += p_prev * trans["right"]
-
-        total = sum(new_probs)
-        self.probabilities = [p / total for p in new_probs]
+        total = sum(new_probabilities)
+        self.probabilities = [p / total for p in new_probabilities]
 
     def one_full_update(self, world_ground_truth, robot_ground_truth, robot_sensor, u: str, z: bool):
         """This is the full update loop that takes in one action, followed by a sensor reading
@@ -161,17 +139,12 @@ class BayesFilter:
         #  Step 1 predict: update your belief by the action (call one of update_belief_move_left or update_belief_move_right)
         #  Step 2 correct: do the correction step (update belief by the sensor reading)
         # YOUR CODE HERE
-        # Step 1: Predict
         if u == "move_left":
             self.update_belief_move_left(robot_ground_truth)
         elif u == "move_right":
             self.update_belief_move_right(robot_ground_truth)
-        else:
-            raise ValueError("Unknown action")
 
-        # Step 2: Correct
         self.update_belief_sensor_reading(world_ground_truth, robot_sensor, z)
-
 
 
 def check_uniform(bf):
