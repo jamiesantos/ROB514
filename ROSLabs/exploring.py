@@ -133,33 +133,6 @@ def find_all_possible_goals(im):
                 possible_pixels.append((i,j))
     return possible_pixels
 
-def find_reachable_free_neighbor(im, pix, robot_loc):
-    """
-    Given a frontier point (unseen next to free), return a reachable free pixel
-    that is close to it.
-    """
-    candidates = []
-
-    # Gather 8-connected neighbors so we get more choices
-    for nbr in path_planning.eight_connected(pix):
-        x, y = nbr
-        if 0 <= x < im.shape[1] and 0 <= y < im.shape[0]:
-            if path_planning.is_free(im, nbr):
-                candidates.append(nbr)
-
-    best = None
-    best_dist = float('inf')
-
-    # Among all free neighbors, choose the one with the shortest A*/Dijkstra path
-    for nbr in candidates:
-        path = path_planning.dijkstra(im, robot_loc, nbr)
-        if path is not None:
-            if len(path) < best_dist:
-                best = nbr
-                best_dist = len(path)
-
-    return best   # can be None if nothing reachable
-'''    
 def find_best_point(im, possible_points, robot_loc):
     """ Pick one of the unseen points to go to
     @param im - thresholded image
@@ -181,55 +154,51 @@ def find_best_point(im, possible_points, robot_loc):
     distance_max = 0
 
     for point in possible_points:
-        x,y = point
+        x, y = point
         if not (x_min <= x <= x_max and y_min <= y <= y_max):
             continue
 
-        free = []
-        for point_adj in path_planning.four_connected(point):
-            i, j = point_adj
+        # Find free reachable neighbor
+        free_neighbors = []
+        for nbr in path_planning.four_connected(point):
+            i, j = nbr
             if 0 <= i < im.shape[1] and 0 <= j < im.shape[0]:
-                if path_planning.is_free(im, point_adj):
-                    free.append(point_adj)
-        if not free:
+                if path_planning.is_free(im, nbr):
+                    free_neighbors.append(nbr)
+
+        if not free_neighbors:
             continue
-        for point_adj in free:
+
+        # Choose the reachable neighbor with shortest path
+        reachable_neighbor = None
+        best_local_dist = float('inf')
+
+        for nbr in free_neighbors:
             try:
-                path = path_planning.dijkstra(im, robot_loc, point_adj)
-                if path is not None:
-                    distance = len(path)
-                    if distance > distance_max:
-                        best_point = point_adj
-                        distance_max = distance
+                path = path_planning.dijkstra(im, robot_loc, nbr)
             except:
                 continue
 
-    return best_point
-'''
-def find_best_point(im, possible_points, robot_loc):
-
-    best_point = None
-    longest_dist = 0
-
-    for frontier in possible_points:
-
-        # IMPORTANT CHANGE:
-        # Instead of trying to go to the frontier point directly,
-        # we find a reachable free pixel near it.
-        reachable_neighbor = find_reachable_free_neighbor(im, frontier, robot_loc)
+            if path is not None and len(path) < best_local_dist:
+                best_local_dist = len(path)
+                reachable_neighbor = nbr
 
         if reachable_neighbor is None:
-            continue   # Skip unreachable frontier pixels
+            continue
 
-        # Now compute path to the reachable free pixel
-        path = path_planning.dijkstra(im, robot_loc, reachable_neighbor)
+        # Compute path length to reachable free neighbor
+        try:
+            path = path_planning.dijkstra(im, robot_loc, reachable_neighbor)
+        except:
+            continue
+
         if path is None:
             continue
 
         dist = len(path)
-        if dist > longest_dist:
-            longest_dist = dist
-            best_point = reachable_neighbor   # NOT frontier; use reachable pixel
+        if dist > distance_max:
+            best_point = reachable_neighbor
+            distance_max = dist
 
     return best_point
 
