@@ -149,7 +149,7 @@ def eight_connected(pix):
             ret = pix[0] + indx, pix[1] + j
             yield ret
 
-
+'''
 def dijkstra(im, robot_loc, goal_loc):
     """ Occupancy grid image, with robot and goal loc as pixels
     @param im - the thresholded image - use is_free(i, j) to determine if in reachable node
@@ -243,6 +243,53 @@ def dijkstra(im, robot_loc, goal_loc):
     path.reverse()
 
     return path
+'''
+def dijkstra(im, robot_loc, goal_loc):
+
+    if not is_free(im, robot_loc) or not is_free(im, goal_loc):
+        return None
+
+    pq = []
+    heapq.heappush(pq, (0, robot_loc))
+
+    visited = {}
+    visited[robot_loc] = (0, None, False)   # dist, parent, closed
+
+    while pq:
+        dist, node = heapq.heappop(pq)
+
+        curr_dist, curr_parent, closed = visited[node]
+        if closed:
+            continue
+
+        visited[node] = (curr_dist, curr_parent, True)
+
+        if node == goal_loc:
+            break     # now safe, because goal is closed
+
+        for nb in four_connected(node):
+            if not is_free(im, nb):
+                continue
+
+            new_cost = dist + 1
+
+            if nb not in visited or new_cost < visited[nb][0]:
+                visited[nb] = (new_cost, node, False)
+                heapq.heappush(pq, (new_cost, nb))
+
+    # If goal not closed → unreachable
+    if goal_loc not in visited or not visited[goal_loc][2]:
+        return None
+
+    # Reconstruct path
+    path = []
+    curr = goal_loc
+    while curr is not None:
+        path.append(curr)
+        curr = visited[curr][1]
+
+    path.reverse()
+    return path
 
 
 def open_image(im_name):
@@ -291,6 +338,9 @@ if __name__ == '__main__':
     robot_start_loc = (1940, 1953)
     robot_goal_loc = (2135, 2045)
     zoom = 0.1
+
+    print("Goal:", robot_goal_loc)
+    print("Goal value:", im_thresh[robot_goal_loc[1], robot_goal_loc[0]])
 
     """
     print(f"Image shape {im_thresh.shape}")
