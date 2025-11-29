@@ -29,7 +29,10 @@ class RobotSensors:
             "door": {},
             "no_door": {}
         }
-
+        
+        # Kalman filter:
+        self.distance_wall_sensor_probabilities = {}
+        
         # In the GUI version, these will be called with values from the GUI after the RobotSensors instance
         #   has been created
         # Actually SET the values for the dictionaries
@@ -57,7 +60,7 @@ class RobotSensors:
             False: (1 - in_prob_see_door_if_not_door)
         }
     }
-
+    '''
     def set_distance_wall_sensor_probabilities(self, sigma=0.1):
         """ Setup the wall sensor probabilities (store them in the dictionary)
         Note: Mean is zero for this assignment
@@ -66,6 +69,23 @@ class RobotSensors:
         # Kalman assignment
         # TODO: Store the mean and standard deviation
         # YOUR CODE HERE
+        self.distance_wall_sensor_probabilities = {
+            "mean": 0.0,
+            "sigma": sigma
+        }
+    '''
+    def set_distance_wall_sensor_probabilities(self, sigma=0.1):
+        """ Setup the wall sensor probabilities (store them in the dictionary)
+        Note: Mean is zero for this assignment
+        @param sigma - sigma of noise"""
+        # Validate
+        if sigma <= 0:
+            raise ValueError("sigma must be positive")
+
+        # Ensure dictionary exists and store sigma under the exact key Kalman expects
+        # Keep any existing structure for door sensor probabilities untouched
+        self.distance_wall_sensor_probabilities = {"mean": 0.0, "sigma": sigma}
+
 
     def query_door(self, robot_gt, world_gt):
         """ Query the door sensor
@@ -111,6 +131,11 @@ class RobotSensors:
         # TODO: Return the distance to the wall (with noise)
         #  This is the Gaussian assignment from your probabilities homework
         # YOUR CODE HERE
+        sigma = self.distance_wall_sensor_probabilities["sigma"]
+        mean  = self.distance_wall_sensor_probabilities["mean"]
+        noise = np.random.normal(mean, sigma)
+        
+        return robot_gt.robot_loc + noise
 
 
 def test_discrete_sensors(b_print=True):
