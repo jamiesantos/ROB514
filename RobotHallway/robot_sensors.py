@@ -60,7 +60,7 @@ class RobotSensors:
             False: (1 - in_prob_see_door_if_not_door)
         }
     }
-    '''
+
     def set_distance_wall_sensor_probabilities(self, sigma=0.1):
         """ Setup the wall sensor probabilities (store them in the dictionary)
         Note: Mean is zero for this assignment
@@ -69,23 +69,13 @@ class RobotSensors:
         # Kalman assignment
         # TODO: Store the mean and standard deviation
         # YOUR CODE HERE
+        if sigma <= 0:
+            raise ValueError("sigma must be positive")
+        
         self.distance_wall_sensor_probabilities = {
             "mean": 0.0,
             "sigma": sigma
         }
-    '''
-    def set_distance_wall_sensor_probabilities(self, sigma=0.1):
-        """ Setup the wall sensor probabilities (store them in the dictionary)
-        Note: Mean is zero for this assignment
-        @param sigma - sigma of noise"""
-        # Validate
-        if sigma <= 0:
-            raise ValueError("sigma must be positive")
-
-        # Ensure dictionary exists and store sigma under the exact key Kalman expects
-        # Keep any existing structure for door sensor probabilities untouched
-        self.distance_wall_sensor_probabilities = {"mean": 0.0, "sigma": sigma}
-
 
     def query_door(self, robot_gt, world_gt):
         """ Query the door sensor
