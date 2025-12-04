@@ -57,14 +57,14 @@ class SendPoints(Node):
         self._result_future = None
 
         # Subscriber after publisher; this is the map
-        '''
+        
         self.map_subscriber = self.create_subscription(
             OccupancyGrid,
             '/map',  # topic name
             self.map_callback,
             10
         )
-        '''
+        
 
         # Create a buffer to put the transform data in
         self.tf_buffer = Buffer()
@@ -384,7 +384,6 @@ class SendPoints(Node):
         # GUIDE: Decide if you need to find new goal points/find a new path
         # This just looks for the last viable goal (that is free) - will grab a goal
         #  that's already been seen
-        '''
         goal_loc_in_image = (map_msg.info.width // 2, map_msg.info.height // 2)
         if self.points:
             for p in self.points:
@@ -418,7 +417,6 @@ class SendPoints(Node):
             reachable_pts.append(map_xy)
 
         self._set_reachable_markers(reachable_pts)
-        '''
 
 # Unlike all the previous code, here we'll start up with a list of points to go to
 def main(args=None):

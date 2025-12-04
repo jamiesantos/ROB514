@@ -391,6 +391,8 @@ class Lab3Driver(Node):
             speed = 0.0
         else:
             speed = max_speed * np.tanh(distance)
+
+        t.twist.linear.x = speed
         # t.twist.linear.x = max_speed
         # t.twist.angular.z = 0.0
         self.get_logger().info(f"Setting twist forward {t.twist.linear.x} angle {t.twist.angular.z}")
