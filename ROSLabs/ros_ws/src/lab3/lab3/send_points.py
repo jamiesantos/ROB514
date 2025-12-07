@@ -85,6 +85,9 @@ class SendPoints(Node):
         self.goal_marker_pub = self.create_publisher(MarkerArray, 'goal_points', 1)
         self.path_marker_pub = self.create_publisher(MarkerArray, 'path_points', 1)
         self.reachable_marker_pub = self.create_publisher(MarkerArray, 'reachable_points', 1)
+        
+        self.waiting_for_goal = True
+        self.points = []
 
     def _start_action_client(self):
         """ Call this to start sending goal, or send the next goal"""
@@ -126,6 +129,7 @@ class SendPoints(Node):
         # This sets the call back for when the driver says it got the goal request 
         self._send_goal_future.add_done_callback(self._goal_sent_callback)
 
+
     def _goal_sent_callback(self, future : Future):
         """ This gets called when the server says I got the goal
         @param future - communicate with the server"""
@@ -138,7 +142,7 @@ class SendPoints(Node):
             # Add a callback for the actual driver executing the goal
             self._result_future: Future = self._goal_handle.get_result_async()
             self._result_future.add_done_callback(self._goal_done_callback)
-
+    '''
     def _goal_done_callback(self, future : Future):
         """ This gets called when the server says I finished the goal"""
         result: NavTarget.Result = future.result().result
@@ -149,6 +153,18 @@ class SendPoints(Node):
             # GUIDE: This is where you should flag if you want to bail on the current set of goals
             # entirely or just skip to the next one
             self.get_logger().info(f"Did not get to goal, stopping {self.current_point}")
+    '''
+    
+    def _goal_done_callback(self, future: Future):
+        result = future.result().result
+        if result:
+            self.get_logger().info("Reached goal — ready for next frontier")
+        else:
+            self.get_logger().info("Goal failed — picking a new frontier anyway")
+
+        # Unlock map_callback to pick a new frontier next time it runs
+        self.waiting_for_goal = True
+
 
     def _feedback_callback(self, feedback):
         """Every time driver loops in the action callback it send back the distance to the target as feedbackack
@@ -369,7 +385,7 @@ class SendPoints(Node):
         pt_x = origin_x + u * resolution
         pt_y = origin_y + v * resolution
         return (pt_x, pt_y)
-
+    '''
     def map_callback(self, map_msg: OccupancyGrid):
         """ Called when the map gets updated. Size etc of the map is in the message"""
         self.get_logger().info(f"Got map size {(map_msg.info.width, map_msg.info.height)}, resolution {map_msg.info.resolution}")
@@ -435,13 +451,94 @@ class SendPoints(Node):
 
         # GUIDE: Change this to get just the points you might consider looking at
         all_unseen = find_all_possible_goals(im_thresh)
-
+        all_unseen = all_unseen[::50]
+        
         reachable_pts = []
         for k in all_unseen:
             map_xy = self.from_image_to_map(map_msg=map_msg, pt_uv=k)
             reachable_pts.append(map_xy)
 
         self._set_reachable_markers(reachable_pts)
+        
+        if all_unseen:
+            new_points = []
+            for (u, v) in all_unseen:
+                map_xy = self.from_image_to_map(map_msg=map_msg, pt_uv=(u, v))
+                new_points.append(map_xy)
+
+            self.points = new_points
+            self.current_point = 0
+            self.start_timer.reset()
+            self._set_reachable_markers(new_points)
+
+        else:
+            self._set_reachable_markers([])   # No frontiers
+        '''
+        
+    def map_callback(self, map_msg: OccupancyGrid):
+        # Only pick a new target if the robot is idle
+        if not self.waiting_for_goal:
+            return
+
+        # Convert map to array
+        im = np.array(map_msg.data, dtype=np.int8).reshape(
+            (map_msg.info.height, map_msg.info.width)
+        )
+        im_thresh = np.zeros_like(im, dtype=np.uint8)
+        im_thresh[im < 10] = 255
+        im_thresh[im >= 100] = 0
+        im_thresh[im == -1] = 128
+
+        # Robot location in map coords
+        tf = self.tf_buffer.lookup_transform(
+            'odom', 'base_link', rclpy.time.Time(),
+            timeout=rclpy.duration.Duration(seconds=1.0)
+        )
+        robot_xy = (tf.transform.translation.x, tf.transform.translation.y)
+        robot_uv = self.from_map_to_image(map_msg, robot_xy)
+
+        # ---- Frontier extraction ----
+        all_frontiers = find_all_possible_goals(im_thresh)
+
+        if not all_frontiers:
+            self.get_logger().info("No frontiers left.")
+            return
+
+        # ---- Minimal filtering ----
+        filtered = []
+        min_dist = int(1.0 / map_msg.info.resolution)   # at least 1 meter away
+
+        for (u, v) in all_frontiers:
+            # skip points near borders (avoid corners)
+            if not (5 < u < map_msg.info.width - 5 and 5 < v < map_msg.info.height - 5):
+                continue
+
+            # skip points too close to robot
+            if (u - robot_uv[0])**2 + (v - robot_uv[1])**2 < min_dist**2:
+                continue
+
+            filtered.append((u, v))
+
+        if not filtered:
+            self.get_logger().info("No filtered frontiers left.")
+            return
+
+        # ---- Pick ONE frontier (closest) ----
+        filtered.sort(key=lambda uv: (uv[0] - robot_uv[0])**2 + (uv[1] - robot_uv[1])**2)
+        best_uv = filtered[0]
+        best_xy = self.from_image_to_map(map_msg, best_uv)
+
+        self.points = [best_xy]
+        self.current_point = 0
+        self.waiting_for_goal = False
+
+        # show marker
+        self._set_reachable_markers([best_xy])
+
+        # trigger goal send
+        self.start_timer.reset()
+
+        self.get_logger().info(f"Selected new frontier goal {best_xy}")
 
 # Unlike all the previous code, here we'll start up with a list of points to go to
 def main(args=None):
