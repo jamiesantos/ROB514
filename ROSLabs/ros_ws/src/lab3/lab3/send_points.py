@@ -370,7 +370,7 @@ class SendPoints(Node):
         pt_y = origin_y + v * resolution
         return (pt_x, pt_y)
 
-    def map_callback(self, map_msg : OccupancyGrid):
+    def map_callback(self, map_msg: OccupancyGrid):
         """ Called when the map gets updated. Size etc of the map is in the message"""
         self.get_logger().info(f"Got map size {(map_msg.info.width, map_msg.info.height)}, resolution {map_msg.info.resolution}")
         self.get_logger().info(f" Origin origin {map_msg.info.origin.position}")
@@ -388,22 +388,31 @@ class SendPoints(Node):
         im_thresh[im >= 100] = 0    # Wall
         im_thresh[im == -1] = 128   # Unknown
 
-        self.get_logger().info(f"N free {np.count_nonzero(im_thresh == 255)}, N walls {np.count_nonzero(im_thresh == 0)}, N {np.count_nonzero(im_thresh == 128)}")
+        self.get_logger().info(f"N free {np.count_nonzero(im_thresh == 255)}, "
+                            f"N walls {np.count_nonzero(im_thresh == 0)}, "
+                            f"N {np.count_nonzero(im_thresh == 128)}")
 
         # Location of robot
-        transform = self.tf_buffer.lookup_transform('odom', 'base_link', rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=1.0))
-        robot_current_loc_in_map = (transform.transform.translation.x, transform.transform.translation.y)
-        robot_current_loc_in_image = self.from_map_to_image(map_msg=map_msg, pt_xy=robot_current_loc_in_map)
+        transform = self.tf_buffer.lookup_transform(
+            'odom', 'base_link', rclpy.time.Time(),
+            timeout=rclpy.duration.Duration(seconds=1.0)
+        )
+        robot_current_loc_in_map = (
+            transform.transform.translation.x,
+            transform.transform.translation.y
+        )
+        robot_current_loc_in_image = self.from_map_to_image(
+            map_msg=map_msg, pt_xy=robot_current_loc_in_map
+        )
         self.get_logger().info(f"Robot current location {robot_current_loc_in_map}")
 
         # GUIDE: Decide if you need to find new goal points/find a new path
-        # This just looks for the last viable goal (that is free) - will grab a goal
-        #  that's already been seen
         goal_loc_in_image = (map_msg.info.width // 2, map_msg.info.height // 2)
         if self.points:
             for p in self.points:
                 try_goal_loc_in_image = self.from_map_to_image(map_msg=map_msg, pt_xy=p)
-                if try_goal_loc_in_image[0] < map_msg.info.width and try_goal_loc_in_image[1] < map_msg.info.height:
+                if (try_goal_loc_in_image[0] < map_msg.info.width and 
+                    try_goal_loc_in_image[1] < map_msg.info.height):
                     if is_free(im_thresh, try_goal_loc_in_image):
                         goal_loc_in_image = try_goal_loc_in_image
 
@@ -426,8 +435,9 @@ class SendPoints(Node):
 
         # GUIDE: Change this to get just the points you might consider looking at
         all_unseen = find_all_possible_goals(im_thresh)
+
         reachable_pts = []
-        for k, _ in all_unseen.items():
+        for k in all_unseen:
             map_xy = self.from_image_to_map(map_msg=map_msg, pt_uv=k)
             reachable_pts.append(map_xy)
 
