@@ -336,9 +336,16 @@ class SendPoints(Node):
 
         # GUIDE: Subtract the origin position of the map and then divide by the resolution
         #   Don't forget to cast to an int
-  # YOUR CODE HERE
-        
+        # YOUR CODE HERE
         # self.get_logger().info(f"before {pt_xy} after {im_u}, {im_v}")
+        resolution = info.resolution
+        origin_x = info.origin.position.x
+        origin_y = info.origin.position.y
+
+        x, y = pt_xy
+
+        im_u = int((x - origin_x) / resolution)
+        im_v = int((y - origin_y) / resolution)
         return (im_u, im_v)
             
     def from_image_to_map(self, map_msg : OccupancyGrid, pt_uv = (0, 0)):
@@ -351,8 +358,16 @@ class SendPoints(Node):
         pt_x = 0.0
         pt_y = 0.0
         # GUIDE: Multiply by the resolution then add the origin position of the map 
-  # YOUR CODE HERE
+        # YOUR CODE HERE
         # self.get_logger().info(f"before {pt_uv} after {pt_x}, {pt_y}")
+        resolution = info.resolution
+        origin_x = info.origin.position.x
+        origin_y = info.origin.position.y
+
+        u, v = pt_uv
+
+        pt_x = origin_x + u * resolution
+        pt_y = origin_y + v * resolution
         return (pt_x, pt_y)
 
     def map_callback(self, map_msg : OccupancyGrid):

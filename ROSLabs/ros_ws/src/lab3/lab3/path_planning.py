@@ -201,12 +201,17 @@ def dijkstra(im, robot_loc, goal_loc):
         #  Lec : Planning, at the end
         #  https://docs.google.com/presentation/d/1pt8AcSKS2TbKpTAVV190pRHgS_M38ldtHQHIltcYH6Y/edit#slide=id.g18d0c3a1e7d_0_0
         # YOUR CODE HERE
+
+        # Step 2: if closed, skip
+        if visited_closed_yn:
+            continue
+
+        # Step 3: close this node
+        visited[current_node_ij] = (visited_distance, visited_parent, True)
+
+        # Step 1: break if goal found AFTER closing it
         if current_node_ij == goal_loc:
             break
-        elif visited[current_node_ij][2]:
-            continue
-        else:
-             visited[current_node_ij] = (visited_distance, visited_parent, True)
 
         # Check each neighbor
         for neighbor in four_connected(current_node_ij):
@@ -222,21 +227,21 @@ def dijkstra(im, robot_loc, goal_loc):
 
     # Now check that we actually found the goal node
     try_2 = goal_loc
-    if not goal_loc in visited:
+    if goal_loc not in visited or not visited[goal_loc][2]:
         # GUIDE: Deal with not being able to get to the goal loc
         # YOUR CODE HERE
-        print("Goal unreachable :-(")
         return None
 
     path = []
-    path.append(goal_loc)
     # GUIDE: Build the path by starting at the goal node and working backwards
     # YOUR CODE HERE
 
     curr = goal_loc
-    while curr:
+    # Follow parent pointers until None
+    while curr is not None:
         path.append(curr)
         curr = visited[curr][1]
+
     path.reverse()
 
     return path

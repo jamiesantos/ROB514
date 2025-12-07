@@ -16,6 +16,9 @@ import numpy as np
 # Our priority queue
 import heapq
 
+# Using imageio to read in the image
+import imageio.v2 as imageio
+
 
 # -------------- Showing start and end and path ---------------
 def plot_with_path(im, im_threshhold, zoom=1.0, robot_loc=None, goal_loc=None, path=None):
@@ -146,7 +149,6 @@ def eight_connected(pix):
             ret = pix[0] + indx, pix[1] + j
             yield ret
 
-
 def dijkstra(im, robot_loc, goal_loc):
     """ Occupancy grid image, with robot and goal loc as pixels
     @param im - the thresholded image - use is_free(i, j) to determine if in reachable node
@@ -201,12 +203,17 @@ def dijkstra(im, robot_loc, goal_loc):
         #  Lec : Planning, at the end
         #  https://docs.google.com/presentation/d/1pt8AcSKS2TbKpTAVV190pRHgS_M38ldtHQHIltcYH6Y/edit#slide=id.g18d0c3a1e7d_0_0
         # YOUR CODE HERE
+
+        # Step 2: if closed, skip
+        if visited_closed_yn:
+            continue
+
+        # Step 3: close this node
+        visited[current_node_ij] = (visited_distance, visited_parent, True)
+
+        # Step 1: break if goal found AFTER closing it
         if current_node_ij == goal_loc:
             break
-        elif visited[current_node_ij][2]:
-            continue
-        else:
-             visited[current_node_ij] = (visited_distance, visited_parent, True)
 
         # Check each neighbor
         for neighbor in four_connected(current_node_ij):
@@ -222,34 +229,30 @@ def dijkstra(im, robot_loc, goal_loc):
 
     # Now check that we actually found the goal node
     try_2 = goal_loc
-    if not goal_loc in visited:
+    if goal_loc not in visited or not visited[goal_loc][2]:
         # GUIDE: Deal with not being able to get to the goal loc
         # YOUR CODE HERE
-        print("Goal unreachable :-(")
         return None
 
     path = []
-    path.append(goal_loc)
     # GUIDE: Build the path by starting at the goal node and working backwards
     # YOUR CODE HERE
 
     curr = goal_loc
-    while curr:
+    # Follow parent pointers until None
+    while curr is not None:
         path.append(curr)
         curr = visited[curr][1]
+
     path.reverse()
 
     return path
-
 
 def open_image(im_name):
     """ A helper function to open up the image and the yaml file and threshold
     @param im_name - name of image in Data directory
     @returns image anbd thresholded image"""
 
-    # Using imageio to read in the image
-    import imageio.v2 as imageio
-    # yaml for file format
     import yaml as yaml
 
     # Needed for reading in map info
@@ -291,6 +294,9 @@ if __name__ == '__main__':
     robot_start_loc = (1940, 1953)
     robot_goal_loc = (2135, 2045)
     zoom = 0.1
+
+    print("Goal:", robot_goal_loc)
+    print("Goal value:", im_thresh[robot_goal_loc[1], robot_goal_loc[0]])
 
     """
     print(f"Image shape {im_thresh.shape}")
