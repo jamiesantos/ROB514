@@ -48,7 +48,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 class Lab3Driver(Node):
-    def __init__(self, threshold=0.2):
+    def __init__(self, threshold=0.4):
         """ We have parameters this time
         @param threshold - how close do you have to be before saying you're at the goal? Set to width of robot
         """
@@ -108,6 +108,7 @@ class Lab3Driver(Node):
         self.marker_timer = self.create_timer(1.0, self._marker_callback)
 
         self.count_since_last_scan = 0
+        self.start_time = None
 
     def zero_twist(self):
         """This is a helper class method to create and zero-out a twist"""
@@ -185,15 +186,27 @@ class Lab3Driver(Node):
         self.marker_timer.reset()
 
         return CancelResponse.ACCEPT
-    
+
     def close_enough(self):
         """ Return true if close enough to goal. This will be used in action_callback to stop moving toward the goal
         @ return true/false """
         # YOUR CODE HERE
+        if self.start_time is None:
+            self.start_time = self.get_clock().now()
+
         distance = sqrt(self.target.point.x**2 + self.target.point.y**2)
         if distance < self.threshold:
-            print ("DISTANCE: " + str(distance))
-        return distance < self.threshold
+            print("DISTANCE:", distance)
+            self.start_time = None 
+            return True
+
+        elapsed = (self.get_clock().now() - self.start_time).nanoseconds / 1e9
+
+        if elapsed > 7.0:
+            self.start_time = None
+            return True
+
+        return False
 
     def distance_to_target(self):
         """ Communicate with send points - set to distance to target"""
