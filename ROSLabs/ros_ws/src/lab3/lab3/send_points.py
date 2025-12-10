@@ -382,7 +382,8 @@ class SendPoints(Node):
         """ Called when the map gets updated. Size etc of the map is in the message"""
         self.get_logger().info(f"Got map size {(map_msg.info.width, map_msg.info.height)}, resolution {map_msg.info.resolution}")
         self.get_logger().info(f" Origin origin {map_msg.info.origin.position}")
-        
+       
+        # msg.data is a flat list of int8 values (-1 for unknown, 0 free, 100 occupied)
         if not self.waiting_for_goal:
             return
 
@@ -399,27 +400,41 @@ class SendPoints(Node):
         im_thresh[im >= 100] = 0    # Wall
         im_thresh[im == -1] = 128   # Uknown
         
-        self.get_logger().info(f"N free {np.count_nonzero(im_thresh == 255)}, "
-                    f"N walls {np.count_nonzero(im_thresh == 0)}, "
-                    f"N {np.count_nonzero(im_thresh == 128)}")
+        self.get_logger().info(f"N free {np.count_nonzero(im_thresh == 255)}, N walls {np.count_nonzero(im_thresh == 0)}, N {np.count_nonzero(im_thresh == 128)}")
 
         # Location of robot
-        transform = self.tf_buffer.lookup_transform(
-            'odom', 'base_link', rclpy.time.Time(),
-            timeout=rclpy.duration.Duration(seconds=1.0)
-        )
-        robot_current_loc_in_map = (
-            transform.transform.translation.x,
-            transform.transform.translation.y
-        )
-        robot_current_loc_in_image = self.from_map_to_image(
-            map_msg=map_msg, pt_xy=robot_current_loc_in_map
-        )
+        transform = self.tf_buffer.lookup_transform('odom', 'base_link', rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=1.0))
+        robot_current_loc_in_map = (transform.transform.translation.x, transform.transform.translation.y)
+        robot_current_loc_in_image = self.from_map_to_image(map_msg=map_msg, pt_xy=robot_current_loc_in_map)
         self.get_logger().info(f"Robot current location {robot_current_loc_in_map}")
         
         # GUIDE: Decide if you need to find new goal points/find a new path
-        robot_current_loc_in_map = (tf.transform.translation.x, tf.transform.translation.y)
-        robot_current_loc_in_image = self.from_map_to_image(map_msg, robot_current_loc_in_map)
+        # This just looks for the last viable goal (that is free) - will grab a goal
+        #  that's already been seen
+        goal_loc_in_image = (map_msg.info.width // 2, map_msg.info.height // 2)
+        if self.points:
+            for p in self.points:
+                try_goal_loc_in_image = self.from_map_to_image(map_msg=map_msg, pt_xy=p)
+                if try_goal_loc_in_image[0] < map_msg.info.width and try_goal_loc_in_image[1] < map_msg.info.height:
+                    if is_free(im_thresh, try_goal_loc_in_image):
+                        goal_loc_in_image = try_goal_loc_in_image
+
+        try:
+            path = dijkstra(im_thresh, robot_current_loc_in_image, goal_loc_in_image)
+
+            path_pts = []
+            for p in path:
+                map_xy = self.from_image_to_map(map_msg=map_msg, pt_uv=p)
+                path_pts.append(map_xy)
+            self._set_path_markers(path_pts, 5)
+        except ValueError:
+            if is_free(im_thresh, robot_current_loc_in_image):
+                if is_free(im_thresh, goal_loc_in_image):
+                    self.get_logger().info(f"No valid path {robot_current_loc_in_image} to {goal_loc_in_image}")
+                else:
+                    self.get_logger().info(f"Goal not free {robot_current_loc_in_image} to {goal_loc_in_image}")
+            else:
+                self.get_logger().info(f"Robot starting location not free {robot_current_loc_in_image}")
 
         all_frontiers = find_all_possible_goals(im_thresh)
 
@@ -444,7 +459,8 @@ class SendPoints(Node):
         if not filtered:
             self.get_logger().info("No filtered frontiers left.")
             return
-
+        
+        # GUIDE: Change this to get just the points you might consider looking at
         # Pick closest frontier
         filtered.sort(key=lambda uv: (uv[0] - robot_current_loc_in_image[0])**2 + (uv[1] - robot_current_loc_in_image[1])**2)
         best_uv = filtered[0]
@@ -453,7 +469,6 @@ class SendPoints(Node):
         self.points = [best_xy]
         self.current_point = 0
         self.waiting_for_goal = False
-
 
         self._set_reachable_markers([best_xy])
 
