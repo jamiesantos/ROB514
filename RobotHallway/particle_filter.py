@@ -21,6 +21,21 @@ class ParticleFilter:
 
         # Note that in the GUI version, this will be called with the desired number of samples to save
         self.reset_particles()
+    
+    def get_number_particles(self):
+        """ Return the number of particles"""
+        # YOUR CODE HERE
+        return len(self.particles)
+
+    def get_particle_weight(self, indx_particle : int):
+        """ Return the weight of the particle at index"""
+        # YOUR CODE HERE
+        return self.weights[indx_particle]
+
+    def get_particle_location(self, indx_particle : int):
+        """ Return the x location of the particle"""
+        # YOUR CODE HERE
+        return self.particles[indx_particle]
 
     def reset_particles(self, n_samples=1000):
         """ Initialize particle filter with uniform samples and weights
@@ -296,13 +311,13 @@ def test_particle_filter_syntax(b_print=True):
                 particle_filter.calculate_weights_door_sensor_reading(world_ground_truth, robot_sensor, saw_door)
                 particle_filter.resample_particles()
                 if saw_door != seq["sensor_reading"][i]:
-                    print("Warning: expected {seq['sensor_reading'][i]} got {saw_door}")
+                    print(f"Warning: expected {seq['sensor_reading'][i]} got {saw_door}")
             elif s == "Dist":
                 dist = robot_sensor.query_distance_to_wall(robot_ground_truth)
                 particle_filter.calculate_weights_distance_wall(robot_sensor, dist)
                 particle_filter.resample_particles()
                 if not np.isclose(dist, seq["sensor_reading"][i]):
-                    print("Warning: expected {seq['sensor_reading'][i]} got {dist}")
+                    print(f"Warning: expected {seq['sensor_reading'][i]} got {dist}")
             elif s == "Move":
                 actual_move = robot_ground_truth.move_continuous(seq["move_amount"][i])
                 particle_filter.update_particles_move_continuous(robot_ground_truth, seq["move_amount"][i])
@@ -330,6 +345,187 @@ def test_particle_filter_syntax(b_print=True):
         print("Passed syntax check")
     return True
 
+
+def test_doors(b_print=True):
+    if b_print:
+        print("Testing particle filter (doors)")
+
+    particle_filter = ParticleFilter()
+    world_ground_truth = WorldGroundTruth()
+    robot_ground_truth = RobotGroundTruth()
+    robot_sensor = RobotSensors()
+    # Set the doors
+    seed = 3
+    np.random.seed(seed)
+    world_ground_truth.random_door_placement()
+
+    # Set the probability of seeing a door if there is one
+    robot_sensor.set_door_sensor_probabilites(in_prob_see_door_if_door=0.9, in_prob_see_door_if_not_door=0.2)
+
+    # Do the door query
+    robot_sensor.query_door(world_gt=world_ground_truth, robot_gt=robot_ground_truth)
+    
+    for test_door in {True, False}:
+        # Scatter some particles
+        n_samples = 200
+
+        particle_filter.reset_particles(n_samples=n_samples)
+        if particle_filter.get_number_particles() != n_samples:
+            print(f"Failed: Expected {n_samples} got {particle_filter.get_number_particles()}")
+        else:
+            if b_print:
+                print("Passed get_number_of_particles check")
+
+        # Update particle weights with True
+        particle_filter.calculate_weights_door_sensor_reading(world_ground_truth, robot_sensor, test_door)
+        
+        # Check that the values in front (and not in front) of the door are correct
+        weight_in_front_of_door = -1.0
+        weight_not_in_front_of_door = -1.0
+        b_particle_values_same_in_front_of_door = True
+        b_particle_values_same_not_in_front_of_door = True
+        
+        for indx in range(0, particle_filter.get_number_particles()):
+            if world_ground_truth.is_location_in_front_of_door(particle_filter.get_particle_location(indx)):
+                if weight_in_front_of_door == -1.0:
+                    weight_in_front_of_door = particle_filter.get_particle_weight(indx)
+                else:
+                    if not np.isclose(weight_in_front_of_door, particle_filter.get_particle_weight(indx)):
+                        b_particle_values_same_in_front_of_door = False
+            else:
+                if weight_not_in_front_of_door == -1.0:
+                    weight_not_in_front_of_door = particle_filter.get_particle_weight(indx)
+                else:
+                    if not np.isclose(weight_not_in_front_of_door, particle_filter.get_particle_weight(indx)):
+                        b_particle_values_same_not_in_front_of_door = False
+ 
+        if not b_particle_values_same_in_front_of_door:
+            print("Failed test: All particle values for particles in front of door should be the same")
+            return False
+        else:
+            if b_print:
+                print("Passed: All particle values for particles in front of door should be the same")
+
+        if not b_particle_values_same_not_in_front_of_door:
+            print("Failed test: All particle values for particles NOT in front of door should be the same")
+            return False
+        else:
+            if b_print:
+                print("Passed: All particle values for particles NOT in front of door should be the same")
+
+        if test_door:
+            if not weight_in_front_of_door > weight_not_in_front_of_door:
+                print(f"Failed sensor True test: probability for in front of door should be bigger")
+                return False
+            else:
+                if b_print:
+                    print(f"Passed test_door {test_door}")
+        else:
+            if not weight_in_front_of_door < weight_not_in_front_of_door:
+                print(f"Failed sensor False test: probability for NOT in front of door should be bigger")
+                return False
+            else:
+                if b_print:
+                    print(f"Passed test_door {test_door}")
+    return True
+
+def test_distance(b_print=True):
+    if b_print:
+        print("Testing particle filter (distance)")
+
+    particle_filter = ParticleFilter()
+    world_ground_truth = WorldGroundTruth()
+    robot_ground_truth = RobotGroundTruth()
+    robot_sensor = RobotSensors()
+
+    # Set the doors
+    seed = 3
+
+    np.random.seed(seed)
+    world_ground_truth.random_door_placement()
+
+    # Set the probability of seeing a door if there is one
+    robot_sensor.set_distance_wall_sensor_probabilities(sigma=0.1)
+
+    n_particles = 50
+
+    for loc in np.linspace(0.1, 0.9, 3):
+        robot_ground_truth.robot_loc = loc
+
+        # Do the distance query
+        particle_filter.reset_particles(n_particles)
+        particle_filter.calculate_weights_distance_wall(robot_sensor, loc)
+        loc_weight_pairs = []
+
+        for indx in range(0, particle_filter.get_number_particles()):
+            loc_weight_pairs.append((particle_filter.weights[indx], abs(particle_filter.get_particle_location(indx) - loc)))
+
+        loc_weight_pairs.sort()
+        b_in_descending = True
+        last_dist = loc_weight_pairs[0][1]
+
+        for indx in range(1, particle_filter.get_number_particles()):
+
+            # As the weight goes up, the distance should go down
+            if loc_weight_pairs[indx][1] > last_dist:
+                print(f"Distance: weight is not monotonically decreasing, robot location {loc}")
+                return False
+            last_dist = loc_weight_pairs[indx][1]
+
+    return True
+
+def test_reweighting(b_print=True):
+    if b_print:
+        print("Testing particle filter (reweighting)")
+
+    particle_filter = ParticleFilter()
+    world_ground_truth = WorldGroundTruth()
+    robot_ground_truth = RobotGroundTruth()
+    robot_sensor = RobotSensors()
+
+    # Set the doors
+    seed = 3
+    np.random.seed(seed)
+    world_ground_truth.random_door_placement()
+
+    # Set the probability of seeing a door if there is one
+    robot_sensor.set_distance_wall_sensor_probabilities(sigma=0.1)
+    n_particles = 50
+
+    for loc in np.linspace(0.1, 0.9, 3):
+        # Sensor reading first, to calculate weights
+        robot_ground_truth.robot_loc = loc
+        particle_filter.reset_particles(n_particles)
+        particle_filter.calculate_weights_distance_wall(robot_sensor, loc)
+
+        # Now resample
+        particle_filter.resample_particles()
+
+        # Check that weights are back to the same
+        weight_all = particle_filter.get_particle_weight(0)
+        
+        # Check that more particles in bin with loc than not
+        bins = [0, 0, 0]
+
+        for indx in range(0, particle_filter.get_number_particles()):
+            if not np.isclose(weight_all, particle_filter.get_particle_weight(indx)):
+                print(f"Failure: Expected all weights to be back to the same value {weight_all}, got other value at {indx}")
+                return False
+
+            bin_indx = int(np.floor(particle_filter.get_particle_location(indx) * 2.99))
+            bins[bin_indx] += 1
+
+        cur_bin = int(np.floor(loc * 2.999))
+
+        for j in range (0, 2):
+            not_cur_bin = (cur_bin + 1) % 3
+            if bins[cur_bin] < bins[not_cur_bin]:
+                print(f"Failed: Bin at loc {loc} did not have more particles than bin at {0.1 * not_cur_bin}, bins {bins}")
+
+    if b_print:
+        print("Passed test: All particles have equal weight")
+        print("Passed test: most particles close to robot loc after distance sensor read")
+    return True
 
 if __name__ == '__main__':
     b_print = True
